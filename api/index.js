@@ -128301,12 +128301,13 @@ async function fetchVercelAnalytics(token, projectId, timeRange, accountName, ac
 // server/services/cloudflare.service.ts
 async function fetchCloudflareAnalytics(token, zoneId, timeRange, accountName, accountId) {
   const targetZone = zoneId?.trim() || "";
-  if (!token || token.trim().length === 0 || !targetZone || targetZone.startsWith("zone_")) {
+  const effectiveToken = process.env.CLOUDFLARE_ZONE_ANALYTICS_TOKEN?.trim() || token?.trim();
+  if (!effectiveToken || !targetZone || targetZone.startsWith("zone_")) {
     return generateSyntheticTelemetry("cloudflare", accountId, accountName, targetZone, timeRange, false);
   }
   try {
     const headers = {
-      Authorization: `Bearer ${token.trim()}`,
+      Authorization: `Bearer ${effectiveToken}`,
       "Content-Type": "application/json"
     };
     const win = timeRangeWindow(timeRange);
@@ -131208,6 +131209,9 @@ var UNIFIED_ACCOUNT = "acc-unified-all";
 function hasGoogleSa() {
   return !!process.env.GOOGLE_ANALYTICS_SA_JSON_B64 && !!process.env.GOOGLE_ANALYTICS_PROPERTY_ID;
 }
+function hasCfZoneAnalytics() {
+  return !!process.env.CLOUDFLARE_ZONE_ANALYTICS_TOKEN;
+}
 async function resolveUnifiedLive(timeRange) {
   const jobs = [];
   const vercel = vault.getAccount("acc-vercel-edge");
@@ -131215,8 +131219,12 @@ async function resolveUnifiedLive(timeRange) {
     jobs.push(fetchVercelAnalytics(vercel.apiKey, vercel.account.targetResource, timeRange, vercel.account.name, vercel.account.id));
   }
   const cf = vault.getAccount("acc-cf-apex");
-  if (cf?.apiKey) {
-    jobs.push(fetchCloudflareAnalytics(cf.apiKey, cf.account.targetResource, timeRange, cf.account.name, cf.account.id));
+  if (cf?.apiKey || hasCfZoneAnalytics()) {
+    const zones = [process.env.CLOUDFLARE_ZONE_ID, process.env.CLOUDFLARE_ZONE_ID_JAMI].map((z) => z?.trim() || "").filter((z) => z && !z.startsWith("zone_"));
+    const cfName = cf?.account.name ?? "Cloudflare";
+    for (const zoneId of zones.length ? zones : []) {
+      jobs.push(fetchCloudflareAnalytics("", zoneId, timeRange, cfName, "acc-cf-apex"));
+    }
   }
   if (hasGoogleSa()) {
     const ga = vault.getAccount("acc-ga4-main");

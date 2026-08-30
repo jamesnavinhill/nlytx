@@ -28,13 +28,17 @@ export async function fetchCloudflareAnalytics(
 ): Promise<UnifiedAnalyticsData> {
   const targetZone = zoneId?.trim() || '';
 
-  if (!token || token.trim().length === 0 || !targetZone || targetZone.startsWith('zone_')) {
+  // The zone-analytics token is scoped differently from the account token used
+  // for tunnels/workers — prefer it for GraphQL when present.
+  const effectiveToken = process.env.CLOUDFLARE_ZONE_ANALYTICS_TOKEN?.trim() || token?.trim();
+
+  if (!effectiveToken || !targetZone || targetZone.startsWith('zone_')) {
     return generateSyntheticTelemetry('cloudflare', accountId, accountName, targetZone, timeRange, false);
   }
 
   try {
     const headers = {
-      Authorization: `Bearer ${token.trim()}`,
+      Authorization: `Bearer ${effectiveToken}`,
       'Content-Type': 'application/json',
     };
 

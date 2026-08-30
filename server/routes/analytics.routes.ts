@@ -20,6 +20,10 @@ function hasGoogleSa(): boolean {
   return !!process.env.GOOGLE_ANALYTICS_SA_JSON_B64 && !!process.env.GOOGLE_ANALYTICS_PROPERTY_ID;
 }
 
+function hasCfZoneAnalytics(): boolean {
+  return !!process.env.CLOUDFLARE_ZONE_ANALYTICS_TOKEN;
+}
+
 /**
  * Live rollup across every credentialed provider account. Providers without
  * credentials are skipped (never synthesized) — an authenticated user only
@@ -34,8 +38,15 @@ async function resolveUnifiedLive(timeRange: TimeRange): Promise<UnifiedAnalytic
   }
 
   const cf = vault.getAccount('acc-cf-apex');
-  if (cf?.apiKey) {
-    jobs.push(fetchCloudflareAnalytics(cf.apiKey, cf.account.targetResource, timeRange, cf.account.name, cf.account.id));
+  if (cf?.apiKey || hasCfZoneAnalytics()) {
+    // Roll up every configured zone (navinhill.com + jami.studio, etc.)
+    const zones = [process.env.CLOUDFLARE_ZONE_ID, process.env.CLOUDFLARE_ZONE_ID_JAMI]
+      .map((z) => z?.trim() || '')
+      .filter((z) => z && !z.startsWith('zone_'));
+    const cfName = cf?.account.name ?? 'Cloudflare';
+    for (const zoneId of zones.length ? zones : []) {
+      jobs.push(fetchCloudflareAnalytics('', zoneId, timeRange, cfName, 'acc-cf-apex'));
+    }
   }
 
   if (hasGoogleSa()) {
