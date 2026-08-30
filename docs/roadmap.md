@@ -18,7 +18,7 @@ The canon token can't read zone analytics (`authz` on `com.cloudflare.api.accoun
 - Edit the existing token in the Cloudflare dashboard (james@jami.studio) and add **Zone → Analytics → Read** for navinhill.com, or
 - Create a new scoped token and add it to `.auth/env/.env.canonical` as `CLOUDFLARE_ANALYTICS_TOKEN` (then project into Nlytx `.env` as `CLOUDFLARE_API_TOKEN`).
 
-Note: nlytx traffic resolves directly to Vercel (unproxied DNS), so CF zone analytics for navinhill.com will mostly show DNS-level traffic; proxied zones (jami.studio) would show real HTTP data.
+Note: nlytx traffic resolves directly to Vercel (unproxied DNS), so CF zone analytics for navinhill.com is ~zero; jami.studio is proxied and shows real HTTP data — **but that traffic is litellm gateway calls (through the tunnel), not human web traffic**. If web-vs-gateway separation matters later, the GraphQL datasets support per-host breakdown (`clientRequestHTTPHost`) to split app domains from gateway hostnames.
 
 ### 2. Oracle OCI connector
 
