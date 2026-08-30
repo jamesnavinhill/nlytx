@@ -2,8 +2,16 @@ import crypto from 'crypto';
 
 /**
  * Discovers every Vercel project the configured tokens can see — the personal
- * account (VERCEL_BEARER_TOKEN) and the studio-jami team (VERCEL_TEAM_TOKEN +
- * VERCEL_TEAM_ID). Results are cached for 5 minutes.
+ * account (VERCEL_BEARER_TOKEN, a dashboard personal access token, vcp_) and
+ * the studio-jami team (VERCEL_TEAM_TOKEN + VERCEL_TEAM_ID). Results are
+ * cached for 5 minutes.
+ *
+ * Token gotcha (verified live 2026-08-30): Vercel OAuth access tokens (vca_)
+ * and refresh tokens (vcr_) are short-lived / single-use-rotated, so they
+ * cannot be stored as static env credentials — a static vca_ died at source
+ * within a day and took the personal-account data down. Only dashboard-minted
+ * personal access tokens (vcp_) are durable; the REST API refuses to mint
+ * them for the CLI's OAuth app ("Cannot create tokens for this app").
  */
 
 export interface VercelSite {
