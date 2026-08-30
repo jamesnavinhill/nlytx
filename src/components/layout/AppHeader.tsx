@@ -2,8 +2,10 @@ import React, { useState } from 'react';
 import { useAnalytics } from '../../context/AnalyticsContext';
 import { useInfrastructure } from '../../context/InfrastructureContext';
 import { useTheme } from '../../context/ThemeContext';
+import { useAuth } from '../../context/AuthContext';
 import { Button } from '../ui/button';
 import { SettingsDialog } from '../settings/SettingsDialog';
+import { LoginDialog } from '../auth/LoginDialog';
 import { TimeRange } from '../../types/analytics';
 import {
   PanelLeftClose,
@@ -12,6 +14,8 @@ import {
   Sun,
   Moon,
   SlidersHorizontal,
+  LogIn,
+  LogOut,
 } from 'lucide-react';
 
 export const AppHeader: React.FC = () => {
@@ -31,7 +35,9 @@ export const AppHeader: React.FC = () => {
   } = useInfrastructure();
 
   const { theme, toggleMode } = useTheme();
+  const { user, logout } = useAuth();
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [loginOpen, setLoginOpen] = useState(false);
 
   const isSyncing = isSyncingAnalytics || isSyncingInfra;
   const handleRefresh = async () => {
@@ -114,6 +120,30 @@ export const AppHeader: React.FC = () => {
           )}
         </Button>
 
+        {/* Auth / Account */}
+        {user ? (
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => logout()}
+            tooltip={`Log out ${user.email}`}
+            className="hover:bg-secondary text-muted-foreground hover:text-foreground h-8 max-w-40 gap-1 px-2"
+          >
+            <LogOut className="h-3.5 w-3.5 shrink-0" />
+            <span className="font-mono text-[10px] truncate">{user.email}</span>
+          </Button>
+        ) : (
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => setLoginOpen(true)}
+            tooltip="Log in to persist accounts"
+            className="hover:bg-secondary text-muted-foreground hover:text-foreground h-8 w-8"
+          >
+            <LogIn className="h-3.5 w-3.5" />
+          </Button>
+        )}
+
         {/* Settings Matrix */}
         <Button
           size="sm"
@@ -127,6 +157,7 @@ export const AppHeader: React.FC = () => {
       </div>
 
       <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
+      <LoginDialog open={loginOpen} onOpenChange={setLoginOpen} />
     </header>
   );
 };

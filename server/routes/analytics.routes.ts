@@ -9,6 +9,33 @@ import { TimeRange, ProviderType, UnifiedAnalyticsData } from '../../src/types/a
 
 const router = Router();
 
+async function resolveAnalyticsPayload(
+  provider: ProviderType,
+  accountId: string,
+  timeRange: TimeRange
+): Promise<UnifiedAnalyticsData> {
+  const stored = vault.getAccount(accountId);
+  const targetResource = stored?.account.targetResource || 'unified-mesh';
+  const accountName = stored?.account.name || 'Analytics Feed';
+  // Google credentials live in the SA JSON env var, not the vault — treat the
+  // GA4 account as credentialed when it's present.
+  const hasKey =
+    !!stored?.apiKey ||
+    (provider === 'google' && !!process.env.GOOGLE_ANALYTICS_SA_JSON_B64 && !!process.env.GOOGLE_ANALYTICS_PROPERTY_ID);
+
+  if (provider === 'vercel' && hasKey) {
+    return fetchVercelAnalytics(stored.apiKey!, targetResource, timeRange, accountName, accountId);
+  }
+  if (provider === 'cloudflare' && hasKey) {
+    return fetchCloudflareAnalytics(stored.apiKey!, targetResource, timeRange, accountName, accountId);
+  }
+  if (provider === 'google' && hasKey) {
+    return fetchGoogleAnalytics(stored.apiKey ?? '', targetResource, timeRange, accountName, accountId);
+  }
+  // Demo mode: no credentials for this provider
+  return generateSyntheticTelemetry(provider, accountId, accountName, targetResource, timeRange, stored?.account.isLiveConnected || false);
+}
+
 // GET /api/analytics/data - Efficient cached analytics retrieval
 router.get('/data', async (req: Request, res: Response): Promise<void> => {
   const startTime = Date.now();
@@ -34,30 +61,7 @@ router.get('/data', async (req: Request, res: Response): Promise<void> => {
       }
     }
 
-    const stored = vault.getAccount(accountId);
-    const targetResource = stored?.account.targetResource || 'unified-mesh';
-    const accountName = stored?.account.name || 'Analytics Feed';
-    const hasKey = !!stored?.apiKey;
-
-    let payload: UnifiedAnalyticsData;
-
-    if (provider === 'vercel' && hasKey) {
-      payload = await fetchVercelAnalytics(stored.apiKey!, targetResource, timeRange, accountName, accountId);
-    } else if (provider === 'cloudflare' && hasKey) {
-      payload = await fetchCloudflareAnalytics(stored.apiKey!, targetResource, timeRange, accountName, accountId);
-    } else if (provider === 'google' && hasKey) {
-      payload = await fetchGoogleAnalytics(stored.apiKey!, targetResource, timeRange, accountName, accountId);
-    } else {
-      // Default unified synthesis
-      payload = generateSyntheticTelemetry(
-        provider,
-        accountId,
-        accountName,
-        targetResource,
-        timeRange,
-        stored?.account.isLiveConnected || false
-      );
-    }
+    const payload = await resolveAnalyticsPayload(provider, accountId, timeRange);
 
     // Store in cache for 60 seconds
     analyticsCache.set(provider, accountId, timeRange, payload);
@@ -89,29 +93,7 @@ router.post('/sync', async (req: Request, res: Response): Promise<void> => {
     // Invalidate stale cache
     analyticsCache.invalidate(resolvedProvider, resolvedAccountId);
 
-    const stored = vault.getAccount(resolvedAccountId);
-    const targetResource = stored?.account.targetResource || 'unified-mesh';
-    const accountName = stored?.account.name || 'Analytics Feed';
-    const hasKey = !!stored?.apiKey;
-
-    let payload: UnifiedAnalyticsData;
-
-    if (resolvedProvider === 'vercel' && hasKey) {
-      payload = await fetchVercelAnalytics(stored.apiKey!, targetResource, resolvedTimeRange, accountName, resolvedAccountId);
-    } else if (resolvedProvider === 'cloudflare' && hasKey) {
-      payload = await fetchCloudflareAnalytics(stored.apiKey!, targetResource, resolvedTimeRange, accountName, resolvedAccountId);
-    } else if (resolvedProvider === 'google' && hasKey) {
-      payload = await fetchGoogleAnalytics(stored.apiKey!, targetResource, resolvedTimeRange, accountName, resolvedAccountId);
-    } else {
-      payload = generateSyntheticTelemetry(
-        resolvedProvider,
-        resolvedAccountId,
-        accountName,
-        targetResource,
-        resolvedTimeRange,
-        stored?.account.isLiveConnected || false
-      );
-    }
+    const payload = await resolveAnalyticsPayload(resolvedProvider, resolvedAccountId, resolvedTimeRange);
 
     analyticsCache.set(resolvedProvider, resolvedAccountId, resolvedTimeRange, payload);
 

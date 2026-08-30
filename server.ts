@@ -1,28 +1,15 @@
+import 'dotenv/config';
 import express from 'express';
 import path from 'path';
-import dotenv from 'dotenv';
 import { createServer as createViteServer } from 'vite';
-import analyticsRoutes from './server/routes/analytics.routes';
-import accountsRoutes from './server/routes/accounts.routes';
-import infrastructureRoutes from './server/routes/infrastructure.routes';
-
-dotenv.config();
+import { createApiApp } from './server/app';
 
 async function startServer() {
   const app = express();
   const PORT = 3000;
 
   app.use(express.json());
-
-  // API endpoints
-  app.get('/api/health', (req, res) => {
-    res.json({ status: 'ok', timestamp: new Date().toISOString() });
-  });
-
-  app.use('/api/analytics', analyticsRoutes);
-  app.use('/api/accounts', accountsRoutes);
-  app.use('/api/infrastructure', infrastructureRoutes);
-
+  app.use(createApiApp());
 
   // Vite integration
   if (process.env.NODE_ENV !== 'production') {
