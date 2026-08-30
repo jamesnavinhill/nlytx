@@ -4,50 +4,107 @@ import { fetchVercelAnalytics } from '../services/vercel.service';
 import { fetchCloudflareAnalytics } from '../services/cloudflare.service';
 import { fetchGoogleAnalytics } from '../services/google-analytics.service';
 import { generateSyntheticTelemetry } from '../services/telemetry-generator.service';
+import { mergeAnalyticsPayloads } from '../services/unified.service';
+import { buildEmptyAnalyticsPayload } from '../services/telemetry-base';
 import { analyticsCache } from '../services/cache.service';
+import { attachUser } from './auth.routes';
 import { TimeRange, ProviderType, UnifiedAnalyticsData } from '../../src/types/analytics';
 
 const router = Router();
 
+router.use(attachUser);
+
+const UNIFIED_ACCOUNT = 'acc-unified-all';
+
+function hasGoogleSa(): boolean {
+  return !!process.env.GOOGLE_ANALYTICS_SA_JSON_B64 && !!process.env.GOOGLE_ANALYTICS_PROPERTY_ID;
+}
+
+/**
+ * Live rollup across every credentialed provider account. Providers without
+ * credentials are skipped (never synthesized) — an authenticated user only
+ * ever sees real data, even if that means an honest empty view.
+ */
+async function resolveUnifiedLive(timeRange: TimeRange): Promise<UnifiedAnalyticsData> {
+  const jobs: Promise<UnifiedAnalyticsData>[] = [];
+
+  const vercel = vault.getAccount('acc-vercel-edge');
+  if (vercel?.apiKey) {
+    jobs.push(fetchVercelAnalytics(vercel.apiKey, vercel.account.targetResource, timeRange, vercel.account.name, vercel.account.id));
+  }
+
+  const cf = vault.getAccount('acc-cf-apex');
+  if (cf?.apiKey) {
+    jobs.push(fetchCloudflareAnalytics(cf.apiKey, cf.account.targetResource, timeRange, cf.account.name, cf.account.id));
+  }
+
+  if (hasGoogleSa()) {
+    const ga = vault.getAccount('acc-ga4-main');
+    jobs.push(fetchGoogleAnalytics('', ga?.account.targetResource ?? '', timeRange, ga?.account.name ?? 'Google Analytics', 'acc-ga4-main'));
+  }
+
+  if (jobs.length === 0) {
+    return buildEmptyAnalyticsPayload('unified', UNIFIED_ACCOUNT, 'All Accounts', 'all-live-sources', timeRange);
+  }
+
+  const settled = await Promise.allSettled(jobs);
+  const parts = settled
+    .filter((s): s is PromiseFulfilledResult<UnifiedAnalyticsData> => s.status === 'fulfilled')
+    .map((s) => s.value);
+
+  return mergeAnalyticsPayloads(parts, timeRange) ?? buildEmptyAnalyticsPayload('unified', UNIFIED_ACCOUNT, 'All Accounts', 'all-live-sources', timeRange);
+}
+
 async function resolveAnalyticsPayload(
   provider: ProviderType,
   accountId: string,
-  timeRange: TimeRange
+  timeRange: TimeRange,
+  authenticated: boolean
 ): Promise<UnifiedAnalyticsData> {
+  // Unified view: demo for anonymous visitors, live rollup for signed-in users.
+  if (provider === 'unified' || accountId === UNIFIED_ACCOUNT) {
+    if (!authenticated) {
+      return generateSyntheticTelemetry('unified', accountId, 'Analytics Feed', 'unified-mesh', timeRange, false);
+    }
+    return resolveUnifiedLive(timeRange);
+  }
+
   const stored = vault.getAccount(accountId);
   const targetResource = stored?.account.targetResource || 'unified-mesh';
   const accountName = stored?.account.name || 'Analytics Feed';
-  // Google credentials live in the SA JSON env var, not the vault — treat the
-  // GA4 account as credentialed when it's present.
-  const hasKey =
-    !!stored?.apiKey ||
-    (provider === 'google' && !!process.env.GOOGLE_ANALYTICS_SA_JSON_B64 && !!process.env.GOOGLE_ANALYTICS_PROPERTY_ID);
+  const hasKey = !!stored?.apiKey || (provider === 'google' && hasGoogleSa());
 
-  if (provider === 'vercel' && hasKey) {
-    return fetchVercelAnalytics(stored.apiKey!, targetResource, timeRange, accountName, accountId);
+  if (provider === 'vercel' && stored?.apiKey) {
+    return fetchVercelAnalytics(stored.apiKey, targetResource, timeRange, accountName, accountId);
   }
-  if (provider === 'cloudflare' && hasKey) {
-    return fetchCloudflareAnalytics(stored.apiKey!, targetResource, timeRange, accountName, accountId);
+  if (provider === 'cloudflare' && stored?.apiKey) {
+    return fetchCloudflareAnalytics(stored.apiKey, targetResource, timeRange, accountName, accountId);
   }
-  if (provider === 'google' && hasKey) {
-    return fetchGoogleAnalytics(stored.apiKey ?? '', targetResource, timeRange, accountName, accountId);
+  if (provider === 'google' && hasGoogleSa()) {
+    return fetchGoogleAnalytics(stored?.apiKey ?? '', targetResource, timeRange, accountName, accountId);
   }
-  // Demo mode: no credentials for this provider
-  return generateSyntheticTelemetry(provider, accountId, accountName, targetResource, timeRange, stored?.account.isLiveConnected || false);
+
+  // No credentials: signed-in users get an honest empty view, anonymous get demo.
+  if (authenticated) {
+    return buildEmptyAnalyticsPayload(provider, accountId, accountName, targetResource, timeRange);
+  }
+  return generateSyntheticTelemetry(provider, accountId, accountName, targetResource, timeRange, false);
 }
 
 // GET /api/analytics/data - Efficient cached analytics retrieval
 router.get('/data', async (req: Request, res: Response): Promise<void> => {
   const startTime = Date.now();
   try {
-    const accountId = (req.query.accountId as string) || 'acc-unified-all';
+    const accountId = (req.query.accountId as string) || UNIFIED_ACCOUNT;
     const provider = (req.query.provider as ProviderType) || 'unified';
     const timeRange = (req.query.timeRange as TimeRange) || '24h';
     const forceRefresh = req.query.forceRefresh === 'true' || req.query.sync === 'true';
+    const authenticated = !!req.user;
+    // Separate cache namespaces so demo and live payloads never collide
+    const cacheAccountId = authenticated ? `u:${accountId}` : accountId;
 
-    // Check cache first unless force refresh requested
     if (!forceRefresh) {
-      const cached = analyticsCache.get(provider, accountId, timeRange);
+      const cached = analyticsCache.get(provider, cacheAccountId, timeRange);
       if (cached) {
         res.json({
           success: true,
@@ -61,10 +118,8 @@ router.get('/data', async (req: Request, res: Response): Promise<void> => {
       }
     }
 
-    const payload = await resolveAnalyticsPayload(provider, accountId, timeRange);
-
-    // Store in cache for 60 seconds
-    analyticsCache.set(provider, accountId, timeRange, payload);
+    const payload = await resolveAnalyticsPayload(provider, accountId, timeRange, authenticated);
+    analyticsCache.set(provider, cacheAccountId, timeRange, payload);
 
     res.json({
       success: true,
@@ -86,16 +141,16 @@ router.post('/sync', async (req: Request, res: Response): Promise<void> => {
   const startTime = Date.now();
   try {
     const { accountId, provider, timeRange } = req.body;
-    const resolvedAccountId = accountId || 'acc-unified-all';
+    const resolvedAccountId = accountId || UNIFIED_ACCOUNT;
     const resolvedProvider: ProviderType = provider || 'unified';
     const resolvedTimeRange: TimeRange = timeRange || '24h';
+    const authenticated = !!req.user;
+    const cacheAccountId = authenticated ? `u:${resolvedAccountId}` : resolvedAccountId;
 
-    // Invalidate stale cache
-    analyticsCache.invalidate(resolvedProvider, resolvedAccountId);
+    analyticsCache.invalidate(resolvedProvider, cacheAccountId);
 
-    const payload = await resolveAnalyticsPayload(resolvedProvider, resolvedAccountId, resolvedTimeRange);
-
-    analyticsCache.set(resolvedProvider, resolvedAccountId, resolvedTimeRange, payload);
+    const payload = await resolveAnalyticsPayload(resolvedProvider, resolvedAccountId, resolvedTimeRange, authenticated);
+    analyticsCache.set(resolvedProvider, cacheAccountId, resolvedTimeRange, payload);
 
     res.json({
       success: true,

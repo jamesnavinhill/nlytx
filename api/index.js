@@ -127727,7 +127727,7 @@ module.exports = __toCommonJS(api_entry_exports);
 var import_express5 = __toESM(require_express2(), 1);
 
 // server/routes/analytics.routes.ts
-var import_express = __toESM(require_express2(), 1);
+var import_express2 = __toESM(require_express2(), 1);
 
 // server/services/credential-vault.service.ts
 var import_crypto = __toESM(require("crypto"), 1);
@@ -128621,6 +128621,158 @@ async function fetchGoogleAnalytics(_tokenOrKey, propertyId, timeRange, accountN
   }
 }
 
+// server/services/unified.service.ts
+function mergeTimeSeries(parts) {
+  const byTs = /* @__PURE__ */ new Map();
+  for (const part of parts) {
+    for (const pt of part.timeSeries) {
+      const cur = byTs.get(pt.timestamp);
+      if (cur) {
+        cur.visitors += pt.visitors;
+        cur.pageviews += pt.pageviews;
+        cur.requests += pt.requests;
+        cur.bandwidthMb = parseFloat((cur.bandwidthMb + pt.bandwidthMb).toFixed(2));
+        cur.cacheHits += pt.cacheHits;
+        cur.errors += pt.errors;
+      } else {
+        byTs.set(pt.timestamp, { ...pt });
+      }
+    }
+  }
+  return [...byTs.values()].sort((a5, b6) => a5.timestamp.localeCompare(b6.timestamp));
+}
+function mergeAnalyticsPayloads(parts, timeRange) {
+  const live = parts.filter((p3) => p3.isLive);
+  if (live.length === 0) return null;
+  const payload2 = buildEmptyAnalyticsPayload("unified", "acc-unified-all", "All Accounts", "all-live-sources", timeRange);
+  payload2.isLive = true;
+  payload2.accountName = live.map((p3) => p3.accountName).join(" + ");
+  payload2.timeSeries = mergeTimeSeries(live);
+  const totals = live.reduce(
+    (acc, p3) => {
+      acc.visitors += p3.summary.totalVisitors;
+      acc.pageviews += p3.summary.totalPageviews;
+      acc.bandwidth += p3.summary.bandwidthBytes;
+      acc.requests += p3.summary.requestCount;
+      acc.threats += p3.summary.threatsBlocked;
+      acc.weightedBounce += p3.summary.bounceRate * p3.summary.totalPageviews;
+      acc.weightedDuration += p3.summary.avgSessionDuration * p3.summary.totalPageviews;
+      acc.weightedVisitorsChange += p3.summary.visitorsChange * p3.summary.totalPageviews;
+      acc.weightedPvChange += p3.summary.pageviewsChange * p3.summary.totalPageviews;
+      return acc;
+    },
+    { visitors: 0, pageviews: 0, bandwidth: 0, requests: 0, threats: 0, weightedBounce: 0, weightedDuration: 0, weightedVisitorsChange: 0, weightedPvChange: 0 }
+  );
+  const tsRequests = payload2.timeSeries.reduce((a5, p3) => a5 + p3.requests, 0);
+  const tsCache = payload2.timeSeries.reduce((a5, p3) => a5 + p3.cacheHits, 0);
+  const tsErrors = payload2.timeSeries.reduce((a5, p3) => a5 + p3.errors, 0);
+  payload2.summary = {
+    totalVisitors: totals.visitors,
+    totalPageviews: totals.pageviews,
+    bounceRate: totals.pageviews > 0 ? parseFloat((totals.weightedBounce / totals.pageviews).toFixed(1)) : 0,
+    avgSessionDuration: totals.pageviews > 0 ? Math.round(totals.weightedDuration / totals.pageviews) : 0,
+    bandwidthBytes: Math.round(totals.bandwidth),
+    cacheHitRatio: tsRequests > 0 ? parseFloat((tsCache / tsRequests * 100).toFixed(1)) : 0,
+    requestCount: totals.requests,
+    threatsBlocked: totals.threats,
+    errorRate: tsRequests > 0 ? parseFloat((tsErrors / tsRequests * 100).toFixed(2)) : 0,
+    visitorsChange: totals.pageviews > 0 ? parseFloat((totals.weightedVisitorsChange / totals.pageviews).toFixed(1)) : 0,
+    pageviewsChange: totals.pageviews > 0 ? parseFloat((totals.weightedPvChange / totals.pageviews).toFixed(1)) : 0
+  };
+  const byPath = /* @__PURE__ */ new Map();
+  for (const p3 of live) {
+    for (const t of p3.topPaths) {
+      const cur = byPath.get(t.path) ?? { views: 0, visitors: 0, duration: 0, bounce: 0, n: 0 };
+      cur.views += t.views;
+      cur.visitors += t.uniqueVisitors;
+      cur.duration += t.avgDurationSec;
+      cur.bounce += t.bounceRate;
+      cur.n += 1;
+      byPath.set(t.path, cur);
+    }
+  }
+  payload2.topPaths = [...byPath.entries()].sort(([, a5], [, b6]) => b6.views - a5.views).slice(0, 10).map(([path, v]) => ({
+    path,
+    views: v.views,
+    uniqueVisitors: v.visitors,
+    avgDurationSec: v.n ? Math.round(v.duration / v.n) : 0,
+    bounceRate: v.n ? parseFloat((v.bounce / v.n).toFixed(1)) : 0
+  }));
+  const byCountry = /* @__PURE__ */ new Map();
+  for (const p3 of live) for (const g5 of p3.geoDistribution) byCountry.set(g5.countryCode, (byCountry.get(g5.countryCode) ?? 0) + g5.visitors);
+  const totalGeo = [...byCountry.values()].reduce((a5, b6) => a5 + b6, 0);
+  payload2.geoDistribution = [...byCountry.entries()].sort(([, a5], [, b6]) => b6 - a5).slice(0, 10).map(([countryCode, visitors]) => ({
+    countryCode,
+    countryName: live.flatMap((p3) => p3.geoDistribution).find((g5) => g5.countryCode === countryCode)?.countryName ?? countryCode,
+    visitors,
+    percentage: totalGeo > 0 ? parseFloat((visitors / totalGeo * 100).toFixed(1)) : 0
+  }));
+  const byDevice = /* @__PURE__ */ new Map();
+  for (const p3 of live) for (const d5 of p3.devices) byDevice.set(d5.device, (byDevice.get(d5.device) ?? 0) + d5.count);
+  const totalDev = [...byDevice.values()].reduce((a5, b6) => a5 + b6, 0);
+  payload2.devices = [...byDevice.entries()].map(([device, count]) => ({
+    device,
+    count,
+    percentage: totalDev > 0 ? parseFloat((count / totalDev * 100).toFixed(1)) : 0
+  }));
+  payload2.statusCodes = live.reduce(
+    (acc, p3) => ({
+      status2xx: acc.status2xx + p3.statusCodes.status2xx,
+      status3xx: acc.status3xx + p3.statusCodes.status3xx,
+      status4xx: acc.status4xx + p3.statusCodes.status4xx,
+      status5xx: acc.status5xx + p3.statusCodes.status5xx
+    }),
+    { status2xx: 0, status3xx: 0, status4xx: 0, status5xx: 0 }
+  );
+  const vitalsPart = live.find((p3) => p3.webVitals.lcp.value > 0 || p3.webVitals.inp.value > 0 || p3.webVitals.ttfb.value > 0);
+  if (vitalsPart) payload2.webVitals = vitalsPart.webVitals;
+  return payload2;
+}
+function mergeInfraPayloads(parts) {
+  const live = parts.filter((p3) => p3.isLive);
+  if (live.length === 0) return null;
+  const payload2 = buildEmptyInfraPayload("unified-infra", "infra-mesh-all", "All Systems Fleet", "multi-region (Global)");
+  payload2.isLive = true;
+  payload2.accountName = live.map((p3) => p3.accountName).join(" + ");
+  payload2.awsInstances = live.flatMap((p3) => p3.awsInstances);
+  payload2.cloudflareTunnels = live.flatMap((p3) => p3.cloudflareTunnels);
+  payload2.cloudflareWorkers = live.flatMap((p3) => p3.cloudflareWorkers);
+  payload2.oracleInstances = live.flatMap((p3) => p3.oracleInstances);
+  const withCpu = parts.filter((p3) => p3.summary.totalInstances > 0);
+  payload2.summary = {
+    totalInstances: live.reduce((a5, p3) => a5 + p3.summary.totalInstances, 0),
+    healthyInstances: live.reduce((a5, p3) => a5 + p3.summary.healthyInstances, 0),
+    totalTunnels: live.reduce((a5, p3) => a5 + p3.summary.totalTunnels, 0),
+    healthyTunnels: live.reduce((a5, p3) => a5 + p3.summary.healthyTunnels, 0),
+    totalWorkers: live.reduce((a5, p3) => a5 + p3.summary.totalWorkers, 0),
+    workerRequestsPerSec: parseFloat(live.reduce((a5, p3) => a5 + p3.summary.workerRequestsPerSec, 0).toFixed(1)),
+    avgCpuUtilization: withCpu.length ? parseFloat((withCpu.reduce((a5, p3) => a5 + p3.summary.avgCpuUtilization, 0) / withCpu.length).toFixed(1)) : 0,
+    avgMemoryUtilization: 0,
+    activeAlertsCount: live.reduce((a5, p3) => a5 + p3.summary.activeAlertsCount, 0)
+  };
+  payload2.infraLogs = live.flatMap((p3) => p3.infraLogs).sort((a5, b6) => b6.timestamp.localeCompare(a5.timestamp)).slice(0, 30);
+  const byTs = /* @__PURE__ */ new Map();
+  for (const p3 of live) {
+    for (const t of p3.timeSeries) {
+      const cur = byTs.get(t.timestamp) ?? { pts: { cpu: [], mem: [], net: 0, rps: 0, formatted: t.formattedTime } };
+      cur.pts.cpu.push(t.cpuAvg);
+      cur.pts.mem.push(t.memoryAvg);
+      cur.pts.net += t.networkMbps;
+      cur.pts.rps += t.workerRps;
+      byTs.set(t.timestamp, cur);
+    }
+  }
+  payload2.timeSeries = [...byTs.entries()].sort(([a5], [b6]) => a5.localeCompare(b6)).map(([ts, v]) => ({
+    timestamp: ts,
+    formattedTime: v.pts.formatted,
+    cpuAvg: v.pts.cpu.length ? parseFloat((v.pts.cpu.reduce((a5, b6) => a5 + b6, 0) / v.pts.cpu.length).toFixed(1)) : 0,
+    memoryAvg: v.pts.mem.length ? parseFloat((v.pts.mem.reduce((a5, b6) => a5 + b6, 0) / v.pts.mem.length).toFixed(1)) : 0,
+    networkMbps: parseFloat(v.pts.net.toFixed(2)),
+    workerRps: parseFloat(v.pts.rps.toFixed(2))
+  }));
+  return payload2;
+}
+
 // server/services/cache.service.ts
 var TelemetryCacheService = class {
   constructor() {
@@ -128694,86 +128846,8 @@ var TelemetryCacheService = class {
 };
 var analyticsCache = new TelemetryCacheService();
 
-// server/routes/analytics.routes.ts
-var router = (0, import_express.Router)();
-async function resolveAnalyticsPayload(provider, accountId, timeRange) {
-  const stored = vault.getAccount(accountId);
-  const targetResource = stored?.account.targetResource || "unified-mesh";
-  const accountName = stored?.account.name || "Analytics Feed";
-  const hasKey = !!stored?.apiKey || provider === "google" && !!process.env.GOOGLE_ANALYTICS_SA_JSON_B64 && !!process.env.GOOGLE_ANALYTICS_PROPERTY_ID;
-  if (provider === "vercel" && hasKey) {
-    return fetchVercelAnalytics(stored.apiKey, targetResource, timeRange, accountName, accountId);
-  }
-  if (provider === "cloudflare" && hasKey) {
-    return fetchCloudflareAnalytics(stored.apiKey, targetResource, timeRange, accountName, accountId);
-  }
-  if (provider === "google" && hasKey) {
-    return fetchGoogleAnalytics(stored.apiKey ?? "", targetResource, timeRange, accountName, accountId);
-  }
-  return generateSyntheticTelemetry(provider, accountId, accountName, targetResource, timeRange, stored?.account.isLiveConnected || false);
-}
-router.get("/data", async (req, res) => {
-  const startTime = Date.now();
-  try {
-    const accountId = req.query.accountId || "acc-unified-all";
-    const provider = req.query.provider || "unified";
-    const timeRange = req.query.timeRange || "24h";
-    const forceRefresh = req.query.forceRefresh === "true" || req.query.sync === "true";
-    if (!forceRefresh) {
-      const cached = analyticsCache.get(provider, accountId, timeRange);
-      if (cached) {
-        res.json({
-          success: true,
-          data: cached,
-          meta: {
-            cached: true,
-            latencyMs: Date.now() - startTime
-          }
-        });
-        return;
-      }
-    }
-    const payload2 = await resolveAnalyticsPayload(provider, accountId, timeRange);
-    analyticsCache.set(provider, accountId, timeRange, payload2);
-    res.json({
-      success: true,
-      data: payload2,
-      meta: {
-        cached: false,
-        latencyMs: Date.now() - startTime,
-        syncedAt: (/* @__PURE__ */ new Date()).toISOString()
-      }
-    });
-  } catch (error2) {
-    console.error("Failed to load analytics payload:", error2);
-    res.status(500).json({ success: false, error: "Internal telemetry retrieval failure" });
-  }
-});
-router.post("/sync", async (req, res) => {
-  const startTime = Date.now();
-  try {
-    const { accountId, provider, timeRange } = req.body;
-    const resolvedAccountId = accountId || "acc-unified-all";
-    const resolvedProvider = provider || "unified";
-    const resolvedTimeRange = timeRange || "24h";
-    analyticsCache.invalidate(resolvedProvider, resolvedAccountId);
-    const payload2 = await resolveAnalyticsPayload(resolvedProvider, resolvedAccountId, resolvedTimeRange);
-    analyticsCache.set(resolvedProvider, resolvedAccountId, resolvedTimeRange, payload2);
-    res.json({
-      success: true,
-      data: payload2,
-      syncedAt: (/* @__PURE__ */ new Date()).toISOString(),
-      latencyMs: Date.now() - startTime
-    });
-  } catch (error2) {
-    console.error("Failed to trigger synchronization:", error2);
-    res.status(500).json({ success: false, error: "Synchronization trigger failure" });
-  }
-});
-var analytics_routes_default = router;
-
-// server/routes/accounts.routes.ts
-var import_express3 = __toESM(require_express2(), 1);
+// server/routes/auth.routes.ts
+var import_express = __toESM(require_express2(), 1);
 
 // node_modules/postgres/src/index.js
 var import_os = __toESM(require("os"), 1);
@@ -131036,8 +131110,7 @@ async function deleteUserAccount(userId, id) {
 }
 
 // server/routes/auth.routes.ts
-var import_express2 = __toESM(require_express2(), 1);
-var router2 = (0, import_express2.Router)();
+var router = (0, import_express.Router)();
 var COOKIE_NAME = "nlytx_session";
 function sessionCookie(token, expiresAt) {
   const parts = [
@@ -131065,11 +131138,11 @@ async function attachUser(req, res, next) {
   }
   next();
 }
-router2.use(attachUser);
-router2.get("/me", (req, res) => {
+router.use(attachUser);
+router.get("/me", (req, res) => {
   res.json({ user: req.user ?? null, dbConnected: !!process.env.DATABASE_URL });
 });
-router2.post("/register", async (req, res) => {
+router.post("/register", async (req, res) => {
   try {
     await initSchema();
     const { email, password } = req.body ?? {};
@@ -131095,7 +131168,7 @@ router2.post("/register", async (req, res) => {
     res.status(500).json({ success: false, error: "Registration failed" });
   }
 });
-router2.post("/login", async (req, res) => {
+router.post("/login", async (req, res) => {
   try {
     await initSchema();
     const { email, password } = req.body ?? {};
@@ -131116,7 +131189,7 @@ router2.post("/login", async (req, res) => {
     res.status(500).json({ success: false, error: "Login failed" });
   }
 });
-router2.post("/logout", async (req, res) => {
+router.post("/logout", async (req, res) => {
   try {
     const cookie = req.headers.cookie;
     const token = cookie?.split(";").map((c5) => c5.trim()).find((c5) => c5.startsWith(`${COOKIE_NAME}=`))?.slice(COOKIE_NAME.length + 1);
@@ -131126,9 +131199,127 @@ router2.post("/logout", async (req, res) => {
     res.json({ success: true });
   }
 });
-var auth_routes_default = router2;
+var auth_routes_default = router;
+
+// server/routes/analytics.routes.ts
+var router2 = (0, import_express2.Router)();
+router2.use(attachUser);
+var UNIFIED_ACCOUNT = "acc-unified-all";
+function hasGoogleSa() {
+  return !!process.env.GOOGLE_ANALYTICS_SA_JSON_B64 && !!process.env.GOOGLE_ANALYTICS_PROPERTY_ID;
+}
+async function resolveUnifiedLive(timeRange) {
+  const jobs = [];
+  const vercel = vault.getAccount("acc-vercel-edge");
+  if (vercel?.apiKey) {
+    jobs.push(fetchVercelAnalytics(vercel.apiKey, vercel.account.targetResource, timeRange, vercel.account.name, vercel.account.id));
+  }
+  const cf = vault.getAccount("acc-cf-apex");
+  if (cf?.apiKey) {
+    jobs.push(fetchCloudflareAnalytics(cf.apiKey, cf.account.targetResource, timeRange, cf.account.name, cf.account.id));
+  }
+  if (hasGoogleSa()) {
+    const ga = vault.getAccount("acc-ga4-main");
+    jobs.push(fetchGoogleAnalytics("", ga?.account.targetResource ?? "", timeRange, ga?.account.name ?? "Google Analytics", "acc-ga4-main"));
+  }
+  if (jobs.length === 0) {
+    return buildEmptyAnalyticsPayload("unified", UNIFIED_ACCOUNT, "All Accounts", "all-live-sources", timeRange);
+  }
+  const settled = await Promise.allSettled(jobs);
+  const parts = settled.filter((s2) => s2.status === "fulfilled").map((s2) => s2.value);
+  return mergeAnalyticsPayloads(parts, timeRange) ?? buildEmptyAnalyticsPayload("unified", UNIFIED_ACCOUNT, "All Accounts", "all-live-sources", timeRange);
+}
+async function resolveAnalyticsPayload(provider, accountId, timeRange, authenticated) {
+  if (provider === "unified" || accountId === UNIFIED_ACCOUNT) {
+    if (!authenticated) {
+      return generateSyntheticTelemetry("unified", accountId, "Analytics Feed", "unified-mesh", timeRange, false);
+    }
+    return resolveUnifiedLive(timeRange);
+  }
+  const stored = vault.getAccount(accountId);
+  const targetResource = stored?.account.targetResource || "unified-mesh";
+  const accountName = stored?.account.name || "Analytics Feed";
+  const hasKey = !!stored?.apiKey || provider === "google" && hasGoogleSa();
+  if (provider === "vercel" && stored?.apiKey) {
+    return fetchVercelAnalytics(stored.apiKey, targetResource, timeRange, accountName, accountId);
+  }
+  if (provider === "cloudflare" && stored?.apiKey) {
+    return fetchCloudflareAnalytics(stored.apiKey, targetResource, timeRange, accountName, accountId);
+  }
+  if (provider === "google" && hasGoogleSa()) {
+    return fetchGoogleAnalytics(stored?.apiKey ?? "", targetResource, timeRange, accountName, accountId);
+  }
+  if (authenticated) {
+    return buildEmptyAnalyticsPayload(provider, accountId, accountName, targetResource, timeRange);
+  }
+  return generateSyntheticTelemetry(provider, accountId, accountName, targetResource, timeRange, false);
+}
+router2.get("/data", async (req, res) => {
+  const startTime = Date.now();
+  try {
+    const accountId = req.query.accountId || UNIFIED_ACCOUNT;
+    const provider = req.query.provider || "unified";
+    const timeRange = req.query.timeRange || "24h";
+    const forceRefresh = req.query.forceRefresh === "true" || req.query.sync === "true";
+    const authenticated = !!req.user;
+    const cacheAccountId = authenticated ? `u:${accountId}` : accountId;
+    if (!forceRefresh) {
+      const cached = analyticsCache.get(provider, cacheAccountId, timeRange);
+      if (cached) {
+        res.json({
+          success: true,
+          data: cached,
+          meta: {
+            cached: true,
+            latencyMs: Date.now() - startTime
+          }
+        });
+        return;
+      }
+    }
+    const payload2 = await resolveAnalyticsPayload(provider, accountId, timeRange, authenticated);
+    analyticsCache.set(provider, cacheAccountId, timeRange, payload2);
+    res.json({
+      success: true,
+      data: payload2,
+      meta: {
+        cached: false,
+        latencyMs: Date.now() - startTime,
+        syncedAt: (/* @__PURE__ */ new Date()).toISOString()
+      }
+    });
+  } catch (error2) {
+    console.error("Failed to load analytics payload:", error2);
+    res.status(500).json({ success: false, error: "Internal telemetry retrieval failure" });
+  }
+});
+router2.post("/sync", async (req, res) => {
+  const startTime = Date.now();
+  try {
+    const { accountId, provider, timeRange } = req.body;
+    const resolvedAccountId = accountId || UNIFIED_ACCOUNT;
+    const resolvedProvider = provider || "unified";
+    const resolvedTimeRange = timeRange || "24h";
+    const authenticated = !!req.user;
+    const cacheAccountId = authenticated ? `u:${resolvedAccountId}` : resolvedAccountId;
+    analyticsCache.invalidate(resolvedProvider, cacheAccountId);
+    const payload2 = await resolveAnalyticsPayload(resolvedProvider, resolvedAccountId, resolvedTimeRange, authenticated);
+    analyticsCache.set(resolvedProvider, cacheAccountId, resolvedTimeRange, payload2);
+    res.json({
+      success: true,
+      data: payload2,
+      syncedAt: (/* @__PURE__ */ new Date()).toISOString(),
+      latencyMs: Date.now() - startTime
+    });
+  } catch (error2) {
+    console.error("Failed to trigger synchronization:", error2);
+    res.status(500).json({ success: false, error: "Synchronization trigger failure" });
+  }
+});
+var analytics_routes_default = router2;
 
 // server/routes/accounts.routes.ts
+var import_express3 = __toESM(require_express2(), 1);
 var router3 = (0, import_express3.Router)();
 router3.use(attachUser);
 router3.get("/", async (req, res) => {
@@ -132038,6 +132229,77 @@ async function fetchOracleInfraAnalytics(tenancyOcid, userOcid, fingerprint, pri
 
 // server/routes/infrastructure.routes.ts
 var router4 = (0, import_express4.Router)();
+router4.use(attachUser);
+var UNIFIED_ACCOUNT2 = "infra-mesh-all";
+async function resolveInfraData(provider, accountId, timeRange, authenticated = false) {
+  const accountCreds = vault.getInfraAccount(accountId);
+  const account = accountCreds?.account;
+  const name = account?.name || "Infrastructure Fleet";
+  const region = account?.region || "us-east-1";
+  switch (provider) {
+    case "aws": {
+      if (authenticated && !(accountCreds?.apiKey && accountCreds?.apiSecret)) {
+        return buildEmptyInfraPayload("aws", accountId, name, region);
+      }
+      return await fetchAwsInfraAnalytics(
+        accountCreds?.apiKey || "",
+        accountCreds?.apiSecret || "",
+        region,
+        accountId,
+        name,
+        timeRange
+      );
+    }
+    case "cloudflare-infra": {
+      if (authenticated && !accountCreds?.apiKey) {
+        return buildEmptyInfraPayload("cloudflare-infra", accountId, name, "Global Edge");
+      }
+      return await fetchCloudflareInfraAnalytics(
+        accountCreds?.apiKey || "",
+        account?.targetResource || "",
+        accountId,
+        name,
+        timeRange
+      );
+    }
+    case "oracle": {
+      if (authenticated && !(accountCreds?.apiKey && accountCreds?.privateKey)) {
+        return buildEmptyInfraPayload("oracle", accountId, name, region);
+      }
+      return await fetchOracleInfraAnalytics(
+        accountCreds?.apiKey || "",
+        "",
+        "",
+        accountCreds?.privateKey || "",
+        region,
+        accountId,
+        name,
+        timeRange
+      );
+    }
+    case "unified-infra":
+    default: {
+      if (!authenticated) {
+        return generateSyntheticInfraTelemetry("unified-infra", accountId, name, "Global Fleet", timeRange, false);
+      }
+      const jobs = [];
+      const aws = vault.getInfraAccount("infra-aws-prod");
+      if (aws?.apiKey && aws.apiSecret) {
+        jobs.push(fetchAwsInfraAnalytics(aws.apiKey, aws.apiSecret, aws.account.region || "us-east-1", "infra-aws-prod", aws.account.name, timeRange));
+      }
+      const cfd = vault.getInfraAccount("infra-cf-zerotrust");
+      if (cfd?.apiKey && cfd.account.targetResource && !cfd.account.targetResource.startsWith("cf_acc_")) {
+        jobs.push(fetchCloudflareInfraAnalytics(cfd.apiKey, cfd.account.targetResource, "infra-cf-zerotrust", cfd.account.name, timeRange));
+      }
+      if (jobs.length === 0) {
+        return buildEmptyInfraPayload("unified-infra", UNIFIED_ACCOUNT2, "All Systems Fleet", "multi-region (Global)");
+      }
+      const settled = await Promise.allSettled(jobs);
+      const parts = settled.filter((s2) => s2.status === "fulfilled").map((s2) => s2.value);
+      return mergeInfraPayloads(parts) ?? buildEmptyInfraPayload("unified-infra", UNIFIED_ACCOUNT2, "All Systems Fleet", "multi-region (Global)");
+    }
+  }
+}
 router4.get("/accounts", (req, res) => {
   try {
     const provider = req.query.provider;
@@ -132070,60 +132332,19 @@ router4.delete("/accounts/:id", (req, res) => {
     res.status(500).json({ success: false, error: e5.message || "Failed to delete infra account" });
   }
 });
-async function resolveInfraData(provider, accountId, timeRange) {
-  const accountCreds = vault.getInfraAccount(accountId);
-  const account = accountCreds?.account;
-  const name = account?.name || "Infrastructure Fleet";
-  const region = account?.region || "us-east-1";
-  switch (provider) {
-    case "aws": {
-      return await fetchAwsInfraAnalytics(
-        accountCreds?.apiKey || "",
-        accountCreds?.apiSecret || "",
-        region,
-        accountId,
-        name,
-        timeRange
-      );
-    }
-    case "cloudflare-infra": {
-      return await fetchCloudflareInfraAnalytics(
-        accountCreds?.apiKey || "",
-        account?.targetResource || "",
-        accountId,
-        name,
-        timeRange
-      );
-    }
-    case "oracle": {
-      return await fetchOracleInfraAnalytics(
-        accountCreds?.apiKey || "",
-        "",
-        "",
-        accountCreds?.privateKey || "",
-        region,
-        accountId,
-        name,
-        timeRange
-      );
-    }
-    case "unified-infra":
-    default: {
-      return generateSyntheticInfraTelemetry("unified-infra", accountId, name, "Global Fleet", timeRange, false);
-    }
-  }
-}
 router4.get("/data", async (req, res) => {
   try {
     const provider = req.query.provider || "unified-infra";
-    const accountId = req.query.accountId || "infra-mesh-all";
+    const accountId = req.query.accountId || UNIFIED_ACCOUNT2;
     const timeRange = req.query.timeRange || "24h";
-    const cached = analyticsCache.getInfra(provider, accountId, timeRange);
+    const authenticated = !!req.user;
+    const cacheAccountId = authenticated ? `u:${accountId}` : accountId;
+    const cached = analyticsCache.getInfra(provider, cacheAccountId, timeRange);
     if (cached) {
       return res.json({ success: true, data: cached, source: "cache" });
     }
-    const data = await resolveInfraData(provider, accountId, timeRange);
-    analyticsCache.setInfra(provider, accountId, timeRange, data);
+    const data = await resolveInfraData(provider, accountId, timeRange, authenticated);
+    analyticsCache.setInfra(provider, cacheAccountId, timeRange, data);
     res.json({ success: true, data, source: "live" });
   } catch (e5) {
     console.error("Infra data route failure:", e5);
@@ -132132,10 +132353,12 @@ router4.get("/data", async (req, res) => {
 });
 router4.post("/sync", async (req, res) => {
   try {
-    const { provider = "unified-infra", accountId = "infra-mesh-all", timeRange = "24h" } = req.body;
-    analyticsCache.invalidate(provider, accountId);
-    const data = await resolveInfraData(provider, accountId, timeRange);
-    analyticsCache.setInfra(provider, accountId, timeRange, data);
+    const { provider = "unified-infra", accountId = UNIFIED_ACCOUNT2, timeRange = "24h" } = req.body;
+    const authenticated = !!req.user;
+    const cacheAccountId = authenticated ? `u:${accountId}` : accountId;
+    analyticsCache.invalidate(provider, cacheAccountId);
+    const data = await resolveInfraData(provider, accountId, timeRange, authenticated);
+    analyticsCache.setInfra(provider, cacheAccountId, timeRange, data);
     res.json({ success: true, data, source: "sync" });
   } catch (e5) {
     console.error("Infra sync route failure:", e5);
