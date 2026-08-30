@@ -23,26 +23,22 @@ Browser ──► Express API (server.ts)
 - **cache.service.ts** — namespaced in-memory cache, `provider::accountId::timeRange` keys, 60s TTL; `POST /sync` forces invalidation.
 - **telemetry-generator.service.ts / telemetry-generator-infra.service.ts** — synthetic data engines. This is what the public demo site renders, and — currently — everything else too.
 
-## Data plane reality
+## Data plane
 
-The provider services follow this pattern (verified 2026-08-30):
+Rewritten 2026-08-30 to return **real API data** mapped into the unified schema (`buildEmptyAnalyticsPayload` / `buildEmptyInfraPayload` in `telemetry-base.ts` give the contract-complete shells). Per service:
 
-1. If no credential → synthetic telemetry with `isLive: false`.
-2. If credential → **one lightweight real API call** to validate it (e.g. Vercel `GET /v9/projects/{id}`, Cloudflare zone lookup, Cloudflare tunnels/workers list).
-3. The fetched metric payloads are **discarded**; synthetic telemetry is generated anyway with `isLive: true` and the resolved resource name.
+| Service | Real data returned |
+| --- | --- |
+| `vercel.service.ts` | Project identity + Web Analytics `/v1/web/analytics/stats` (daily views/visitors), `top-paths`, Experience insights → web vitals. View counters are 0 until prod traffic accrues. |
+| `cloudflare.service.ts` | Zone identity + GraphQL `httpRequests1dGroups` (requests, pageviews, bytes, cached, threats, uniques, status breakdown). Needs a token with **Zone Analytics Read** — currently falls back to demo. |
+| `google-analytics.service.ts` | GA4 `runReport` (users, pageviews, sessions, bounce, duration) aggregated across date/page/country/device. Authenticates by **minting SA-JWTs at runtime** from `GOOGLE_ANALYTICS_SA_JSON_B64` (50-min cache). |
+| `aws-infra.service.ts` | EC2 `DescribeInstances` + `DescribeInstanceStatus` + CloudWatch `GetMetricStatistics` (CPU avg + history, network kbps, disk ops) via `@aws-sdk`. Memory stays 0 (needs CW agent). |
+| `cloudflare-infra.service.ts` | Real tunnels + connectors + ingress rules (`cfd_tunnel` API) and Workers scripts with GraphQL `workersInvocationsAdaptive` (rps, error rate, p50/p99 CPU). |
+| `oracle-infra.service.ts` | No credentials on disk — still synthetic. |
 
-Per service:
+Demo mode: any provider without credentials (or anonymous public traffic paths that fail) returns `generateSyntheticTelemetry` with `isLive: false`, so the site always renders. Liveness is honest: `isLive: true` only after a real API read succeeded.
 
-| Service | Real API call | Real metrics used? |
-| --- | --- | --- |
-| `vercel.service.ts` | project + deployments lookup | No — metadata only |
-| `cloudflare.service.ts` | GraphQL `httpRequests1dGroups` + zone | No — result discarded |
-| `google-analytics.service.ts` | GA4 `runReport` | No — result discarded |
-| `aws-infra.service.ts` | **none** — just checks key prefix `AKIA`/`ASIA` | No |
-| `cloudflare-infra.service.ts` | tunnels + workers scripts list | No — liveness only |
-| `oracle-infra.service.ts` | **none** | No |
-
-Consequence: with valid credentials the UI labels data "live" and resolves real account/zone names, but all numbers are synthetic. Closing this gap (return the fetched metrics through the unified schema) is the top roadmap item.
+Auth: `/api/auth/*` (register/login/logout/me) issues httpOnly cookie sessions backed by Neon Postgres (`users`, `sessions`). `POST /api/accounts/save` also persists the encrypted credential reference to `user_accounts` for logged-in users; `GET /api/accounts` merges env-seeded + persisted accounts (deduped by id).
 
 ## Known bugs fixed during verification
 

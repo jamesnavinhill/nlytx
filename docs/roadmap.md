@@ -1,43 +1,40 @@
 # Roadmap
 
-Derived from [roadmap/outline.md](roadmap/outline.md) + the 2026-08-30 verification pass. Ordered by what unblocks what. Full evidence in [verification/2026-08-30-verification-report.md](verification/2026-08-30-verification-report.md).
+Derived from [roadmap/outline.md](roadmap/outline.md). Items R1–R4 shipped 2026-08-30; what remains is below. Full evidence in [verification/2026-08-30-verification-report.md](verification/2026-08-30-verification-report.md).
 
-## R1 — Unblock the jamesnavinhill18@gmail.com accounts ✅ DONE (2026-08-30 evening)
+## Shipped 2026-08-30
 
-- [x] **Vercel**: device-flow `vercel login` completed as `jamesnavinhill`; personal token promoted to `.auth/env/.env.canonical` as `VERCEL_JNH_TOKEN` and verified reading `jameshill/nlytx`. The app's `VERCEL_BEARER_TOKEN` now uses it.
-- [x] **Neon**: no new management key needed — the Neon → Vercel integration env (`DATABASE_URL`, `DATABASE_URL_UNPOOLED`, `NEON_AUTH_BASE_URL`) was pulled and verified live. The old `re_5…` value was a Resend key, not Neon.
+- [x] **R1** — jamesnavinhill18 Vercel access (device-flow login, `VERCEL_JNH_TOKEN` in canon) + Neon via the Vercel integration (`DATABASE_URL` et al., verified live).
+- [x] **R2** — API deployed as a Vercel function (`api/index.js`, prebundled CJS via esbuild; `vercel.json` rewrites + SPA fallback); `@vercel/analytics` installed and serving; app env vars configured in Vercel production.
+- [x] **R3** — Real data plane: Cloudflare GraphQL zone analytics (pending token scope, see below), Vercel Web Analytics + insights, GA4 `runReport` with runtime SA-JWT minting, real EC2 `describe-instances` + CloudWatch metrics, real CF tunnels/connectors/ingress + Workers invocation metrics. Synthetic generators remain as demo fallback (outline: "keep Demo Data for the public site").
+- [x] **R4** — Neon Postgres auth: email/password (scrypt), httpOnly cookie sessions, per-user saved accounts persisted in Neon (`users` / `sessions` / `user_accounts` tables, created idempotently); login/register UI in the header.
+- [x] **R6 partial** — env import-order fix, `NEON_S3_*` rename, stale key flagging, docs restructure.
 
-## R2 — Make the live site serve the real app
+## Remaining
 
-- [ ] Add `@vercel/analytics` (outline requirement; also missing locally).
-- [ ] Deploy the Express API as Vercel functions (or split hosting per [deployment.md](deployment.md)) so `/api/*` stops returning NOT_FOUND. Add `vercel.json`.
-- [ ] Mirror `.env` into Vercel project env vars — visible, not hidden (outline requirement).
+### 1. Cloudflare Zone Analytics scope *(needs you, 2 minutes — the only credential left)*
 
-## R3 — Real data plane *(the big one)*
+The canon token can't read zone analytics (`authz` on `com.cloudflare.api.account.zone.analytics.read`) and cannot mint new tokens. Either:
+- Edit the existing token in the Cloudflare dashboard (james@jami.studio) and add **Zone → Analytics → Read** for navinhill.com, or
+- Create a new scoped token and add it to `.auth/env/.env.canonical` as `CLOUDFLARE_ANALYTICS_TOKEN` (then project into Nlytx `.env` as `CLOUDFLARE_API_TOKEN`).
 
-The outline says "Nothing mocked". Today the provider services validate credentials and then render synthetic numbers (details: [architecture.md § Data plane reality](architecture.md#data-plane-reality)).
+Note: nlytx traffic resolves directly to Vercel (unproxied DNS), so CF zone analytics for navinhill.com will mostly show DNS-level traffic; proxied zones (jami.studio) would show real HTTP data.
 
-- [ ] Wire the **fetched** payloads through the unified schema: Cloudflare GraphQL `httpRequests1dGroups` (already queried, currently discarded), Vercel Web Analytics endpoints (`/v1/web/analytics/stats`, `/v1/web/insights/stats` — spec in `_legacy/research/web-analytics-integrations.md`), GA4 `runReport`.
-- [ ] Replace the AWS stub (`aws-infra.service.ts` only checks the key prefix) with real EC2 `describe-instances` + CloudWatch metric queries — the `nlytx-telemetry` IAM user already has exactly these scopes.
-- [ ] Real tunnels/workers metrics for Cloudflare-infra beyond the liveness probe.
-- [ ] Keep `telemetry-generator*.service.ts` as the demo mode for anonymous visitors (outline: "keep Demo Data for the public site") — make it explicit: demo without auth, live with auth.
+### 2. Oracle OCI connector
 
-## R4 — Auth
+No OCI credentials exist on disk anywhere (checked 2026-08-30). Mint an OCI API key + config, add `OCI_TENANCY_OCID` / `OCI_PRIVATE_KEY` (plus user/fingerprint), then replace the synthetic path in `oracle-infra.service.ts` using the real-SDK pattern from `aws-infra.service.ts`.
 
-- [ ] Neon Auth login (JWKS is already live; add session handling + a login UI).
-- [ ] Persist per-user account/credential bindings (the vault is in-memory today; a restart wipes saved accounts — persistence needs the Neon db).
-- [ ] Marketing page (outline: "small clean marketing page") as the public landing; dashboard behind it.
+### 3. Marketing page
 
-## R5 — Infrastructure provisioning (outline "Planned Next")
+Outline: "small clean marketing page" as the public landing, dashboard behind it. SPA is single-view today; add a landing route or separate static page.
 
-- [ ] Oracle x2 — **no OCI credentials exist on disk anywhere** (checked 2026-08-30); mint before provisioning.
-- [ ] Galaxy x2 (litellm, mcp) and AWS langfuse instance — bring `.env`s over from on-disk creds per outline.
-- [ ] Fold these instances into the infrastructure dashboard via the existing provider-service pattern once creds exist.
+### 4. Nice-to-haves
 
-## R6 — Hygiene
+- Web vitals/insights become meaningful as prod traffic accrues (Vercel + GA4 currently 0 by nature, not by bug).
+- Anomaly detection, incident webhooks, K8s telemetry (carried from legacy docs).
+- Rotate/delete the stale `~/.aws-keys/credentials/admin_accessKeys.csv` (fails STS).
+- The `re_5…` value that was mislabeled `NEON_API_KEY` was a Resend key — if Resend is needed for transactional email later, mint properly and name it `RESEND_API_KEY`.
 
-- [x] Fix env import-order bug in `server.ts` (done 2026-08-30).
-- [x] Replace mislabeled `AWS_*` Neon S3 keys with `NEON_S3_*` (done).
-- [ ] Delete stale `~/.aws-keys/credentials/admin_accessKeys.csv` (rotated, fails STS).
-- [ ] Commit the working tree (server.ts fix, `.env.example`, docs, moved legacy docs).
-- [ ] Future milestones carried from legacy docs: K8s telemetry (EKS/GKE/OKE), anomaly detection, incident webhooks.
+## Environment vars in Vercel production (mirror of local .env)
+
+`VAULT_ENCRYPTION_KEY`, `VERCEL_BEARER_TOKEN`, `VERCEL_PROJECT_ID`, `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_ZONE_ID`, `GOOGLE_ANALYTICS_PROPERTY_ID`, `GOOGLE_ANALYTICS_SA_JSON_B64`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION` + the Neon integration vars (`DATABASE_URL`, `DATABASE_URL_UNPOOLED`, `NEON_AUTH_BASE_URL`, `VITE_NEON_AUTH_URL`).

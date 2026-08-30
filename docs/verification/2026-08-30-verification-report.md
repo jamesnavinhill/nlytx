@@ -71,3 +71,15 @@ Everything runnable locally is healthy and honestly labeled; the remote site is 
 - **Neon**: `DATABASE_URL` verified by live connect → db `neondb`, user `neondb_owner`, no tables yet. Neon Auth endpoint reachable. The old `re_5…` value was a **Resend** key mislabeled `NEON_API_KEY` — no Neon management key is needed.
 - **Nlytx `.env` updated**: personal token as `VERCEL_BEARER_TOKEN`, Neon connection strings added, temp `.env.vercel` removed after merge. Server re-verified: vault seeds Vercel live, `GET /api/analytics/data?provider=vercel` → `isLive: true` with real project name `nlytx`.
 - Remaining unchanged: static-only deployment (R2), synthetic data plane (R3), auth code (R4), OCI creds absent (R5).
+
+## Addendum 2 — end-to-end build + deploy, same day late evening
+
+Shipped R2/R3/R4 in one pass and deployed to production (`nlytx.navinhill.com`, deployment `nlytx-a942n7tqp` era onward):
+
+- **Real data plane implemented**: Cloudflare GraphQL analytics, Vercel Web Analytics/insights, GA4 `runReport` with runtime SA-JWT minting (`GOOGLE_ANALYTICS_SA_JSON_B64`), EC2 DescribeInstances + CloudWatch GetMetricStatistics (`@aws-sdk`), CF cfd_tunnel/connections/configurations + Workers `workersInvocationsAdaptive`. Synthetic generators kept as demo fallback; `telemetry-base.ts` provides contract-complete empty shells.
+- **Vercel function packaging** took three iterations (all documented in deployment.md): ESM `ERR_MODULE_NOT_FOUND` → `api/package.json` CJS pin failed (compiler still emitted ESM) → prebundled CJS via esbuild → `.cjs` extension unsupported → final: committed `api/index.js` bundle + `api/package.json` `{"type":"commonjs"}` + source moved to `server/api-entry.ts`.
+- **11 env vars added to Vercel production** via CLI (vault key, Vercel/CF/GA4/AWS credentials).
+- **Live verification at ~05:25 UTC**: `/api/health` 200; Vercel + GA4 + AWS + CF-infra endpoints all `isLive: true` with real data (AWS CPU 1.2% real CloudWatch; CF 1 tunnel + 1 worker); auth register/me working against Neon on prod (`dbConnected: true`); SPA fallback 200; `/_vercel/insights/script.js` 200.
+- **Known limitation**: Cloudflare zone analytics returns authz error (token lacks Zone Analytics Read) → honest demo fallback. One user action fixes it (see roadmap).
+
+Net: the live site is now the real app — demo data for anonymous visitors, live provider data server-side, working accounts that persist in Neon.

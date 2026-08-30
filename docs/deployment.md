@@ -1,6 +1,6 @@
 # Deployment
 
-Verified 2026-08-30. Account mapping comes from [roadmap/outline.md](roadmap/outline.md).
+Verified live 2026-08-30 (post-build). Account mapping comes from [roadmap/outline.md](roadmap/outline.md).
 
 ## Pipeline
 
@@ -8,35 +8,46 @@ Verified 2026-08-30. Account mapping comes from [roadmap/outline.md](roadmap/out
 this repo ──push──► github.com/jamesnavinhill/nlytx (main)
                         │  (Vercel GitHub integration, jamesnavinhill18@gmail.com account)
                         ▼
-              Vercel project prj_M20YXbR6g9k5VzIXQfoaCnv5ihTL
+              Vercel project jameshill/nlytx = prj_M20YXbR6g9k5VzIXQfoaCnv5ihTL
+              buildCommand: bun run build  (see vercel.json)
                         ▼
-              https://nlytx.navinhill.com
-              (DNS: Cloudflare zone navinhill.com, zone id 1d561b7ab18fb22c3ecf01acc2210788 → Vercel)
+              https://nlytx.navinhill.com  (DNS: Cloudflare zone navinhill.com → Vercel)
 ```
 
-- **GitHub source account**: jamesnavinhill18@gmail.com — `gh` CLI is authed as `jamesnavinhill`; repo was renamed `Analytics` → `nlytx`.
-- **Vercel host account**: jamesnavinhill18@gmail.com (per outline: "subdomain host"). The `vercel` CLI on this machine is authed as **james@jami.studio (studio-jami)** — a different account. No token for the personal account exists on disk, so the deployment cannot be inspected or managed via CLI yet (unblock item R1).
-- **DNS**: managed at Cloudflare under james@jami.studio. `nlytx.navinhill.com` → Vercel anycast (216.198.79.65 / 64.29.17.65); apex `navinhill.com` → 76.76.21.21 (also Vercel).
+## Production shape (working)
 
-## What the live deployment serves today
+- **Static SPA**: `vite build` → `dist/`, served by Vercel's CDN. SPA fallback via the `((?!api/).*)` rewrite to `/index.html`.
+- **API**: `api/index.js` — a **prebundled CommonJS function** (esbuild bundle of `server/api-entry.ts`, which wraps `server/app.ts`). `vercel.json` rewrites `/api/(.*)` → the function. `maxDuration: 15`.
+- **Analytics**: `@vercel/analytics` mounted in `src/App.tsx`; script served at `/_vercel/insights/script.js` (verified 200).
 
-Checked via HTTP on 2026-08-30 ~03:27 UTC:
+### Function packaging — why the prebundle exists (learned the hard way)
 
-- ✅ `GET /` → 200, the React dashboard shell ("Unified Web Analytics"), deployed minutes before the check (GitHub auto-deploy working).
-- ❌ `GET /api/health`, `GET /api/analytics/data` → Vercel `NOT_FOUND`. The deployment is **static-only**: `server.ts` (Express) is not deployed as serverless functions, and there is no `api/` directory or `vercel.json` in the repo.
-- ❌ `@vercel/analytics` is not installed and no `_vercel-insights` script is emitted (outline requires it).
+The repo root is `"type": "module"`. Vercel's TS compiler then emits ESM for `api/index.ts`, but keeps relative imports extensionless — Node throws `ERR_MODULE_NOT_FOUND` at runtime. Pinning `api/package.json` to `commonjs` made the loader CJS while the compiler still emitted `import` statements → `SyntaxError`. And `.cjs` is not a supported function extension. The reliable setup (current):
 
-## Making the API live (the missing half)
+1. `server/api-entry.ts` = the function source (TS lives in `server/`, imports extensionless as usual for tsx/esbuild).
+2. `bun run build` also runs `esbuild server/api-entry.ts --bundle --platform=node --format=cjs --outfile=api/index.js` (everything bundled, no externals — ~4.7MB).
+3. `api/index.js` + `api/package.json` (`{"type":"commonjs"}`) are **committed** so the `functions` pattern matches at source scan time.
+4. `api/index.ts` must NOT exist alongside it (conflicting function names error).
 
-The production build already bundles the Express server (`bun run build` → `dist/server.cjs`), but Vercel's current project settings run a static Vite build only. Two viable shapes, decide when building roadmap item R2:
+If you change any `server/` code, run `bun run build` and commit the regenerated `api/index.js` — or just push; the Vercel build regenerates it identically before packaging.
 
-1. **Vercel functions**: move the three route groups into an `api/` directory (Vercel Node functions) or a single catch-all `api/[...path].ts` wrapping the Express app. Add `vercel.json` rewrites so `/api/*` hits the function and everything else falls through to the SPA.
-2. **Different host for the API**: keep Vercel static for the UI and run `dist/server.cjs` on one of the planned instances (Oracle/AWS), proxying through Cloudflare. Matches the outline's "Current Live: Cloudflare Gateway/Tunnel + AWS" pattern.
+## Environment
 
-Either way, credentials must be re-provisioned as Vercel env vars (mirroring `.env`) — note the cross-account Vercel token issue in [environment.md](environment.md) applies to `VERCEL_BEARER_TOKEN` in production too.
+All app credentials are configured as **production** env vars on the project (added via CLI 2026-08-30; list in [roadmap.md](roadmap.md#environment-vars-in-vercel-production-mirror-of-local-env)). Values originate from `C:\Users\james\projects\.auth` canon and mirror the local `.env`. Neon connection vars come from the Neon → Vercel integration.
 
-## Deployment hygiene
+## Account map
 
-- Repo has no `vercel.json`; framework detection is treating this as a static Vite project. Adding it (or an `api/` dir) is part of R2.
-- `bun.lock` has local modifications; commit alongside the next code change.
-- Root user (463183324956) keys stay out of the repo; the app uses the scoped `nlytx-telemetry` IAM user.
+- **GitHub source**: jamesnavinhill18@gmail.com — `gh` CLI authed as `jamesnavinhill`; repo renamed `Analytics` → `nlytx`.
+- **Vercel host**: jamesnavinhill18@gmail.com ("jameshill" context). CLI authed via device-flow login; personal API token in canon as `VERCEL_JNH_TOKEN`.
+- **DNS**: Cloudflare zone `navinhill.com` (`1d561b7ab18fb22c3ecf01acc2210788`), james@jami.studio. Records are unproxied — traffic goes straight to Vercel's edge (which is why Cloudflare zone analytics sees ~no HTTP traffic for this site).
+
+## Verified live (2026-08-30 ~05:25 UTC)
+
+- `GET /api/health` → 200 JSON
+- `GET /api/analytics/data?provider=vercel` → `isLive: true`, project name `nlytx`
+- `GET /api/analytics/data?provider=google` → `isLive: true` (real GA4 property)
+- `GET /api/infrastructure/data?provider=aws` → `isLive: true`, 1 instance, real CloudWatch CPU 1.2%
+- `GET /api/infrastructure/data?provider=cloudflare-infra` → `isLive: true`, real tunnel + worker counts
+- `POST /api/auth/register` + `/me` → session cookie issued, `dbConnected: true`
+- `GET /some/deep/route` → 200 (SPA fallback)
+- `GET /_vercel/insights/script.js` → 200
