@@ -40,6 +40,8 @@ Demo mode: any provider without credentials (or anonymous public traffic paths t
 
 Auth: `/api/auth/*` (register/login/logout/me) issues httpOnly cookie sessions backed by Neon Postgres (`users`, `sessions`). `POST /api/accounts/save` also persists the encrypted credential reference to `user_accounts` for logged-in users; `GET /api/accounts` merges env-seeded + persisted accounts (deduped by id).
 
+Unified views are **auth-gated** (`unified.service.ts`): anonymous visitors get the synthetic demo rollup; signed-in users get a live merge of every credentialed provider account (analytics: time series summed by date, summaries recomputed, top paths/geo/devices merged; infrastructure: instance/tunnel/worker arrays concatenated, logs merged). Signed-in responses never contain synthetic data — a provider without credentials contributes nothing (honest empty view). Cache keys are namespaced `u:` for authenticated requests so demo and live payloads never collide.
+
 ## Known bugs fixed during verification
 
 - **Env load ordering** (`server.ts`): route imports were hoisted above `dotenv.config()`, so the credential vault constructed against an empty env and every seeded account showed `hasKey: false` even with credentials present. Fixed by switching to `import 'dotenv/config'` as the first import (2026-08-30).
