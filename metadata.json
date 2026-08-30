@@ -1,0 +1,6 @@
+{
+  "name": "Unified Web Analytics",
+  "description": "Distraction-free analytics dashboard with dither charts for Vercel, Cloudflare, and Google Analytics.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
