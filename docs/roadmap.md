@@ -10,6 +10,8 @@ Derived from [roadmap/outline.md](roadmap/outline.md). Items R1–R4 shipped 202
 - [x] **R4** — Neon Postgres auth: email/password (scrypt), httpOnly cookie sessions, per-user saved accounts persisted in Neon (`users` / `sessions` / `user_accounts` tables, created idempotently); login/register UI in the header.
 - [x] **R6 partial** — env import-order fix, `NEON_S3_*` rename, stale key flagging, docs restructure.
 
+- [x] **Shipped later on 2026-08-30** — per-site analytics: 13 Vercel projects (nlytx, swarm, sidekick, luna, sherlock, ai-ide, website/navinhill.com, benefit-hunter, jami-studio-docs, jami.studio-marketing, etymalia, avatar, intercal) each as its own account via the current `/v1/query/web-analytics/visits/aggregate` API; 3 Cloudflare zones as separate accounts; unified rollup merges everything; profile avatar menu (settings + login/logout). Known gaps: `hummingbird`, `yrka`, `yrka docs` are not visible — they're not under either reachable Vercel context (yrka deploys under jamie@yrka.io, which has no token on disk); `swarm` returns 400 = Web Analytics not enabled on that project yet.
+
 ## Remaining
 
 ### 1. Cloudflare Zone Analytics scope *(needs you, 2 minutes — the only credential left)*

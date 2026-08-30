@@ -22,6 +22,9 @@ The `.auth` house rule: a key earns a place in canonical env only after a live A
 | `GOOGLE_ANALYTICS_PROPERTY_ID` | discovered 2026-08-30 via SA | ✅ Admin API `accountSummaries` | `properties/503127554` — "marketing" under "jami-studio account" |
 | `GOOGLE_ANALYTICS_API_KEY` | — | ⚠️ path verified, key slot unusable | GA Data API requires OAuth/SA JWT (1h TTL); a static env value cannot work. SA: `jami-studio@jami-studio.iam.gserviceaccount.com`, key file `~/.gcloud-keys/jami-studio/jami-studio-edb6bc6e5d8c.json`. GA Data API was **enabled** on GCP project `275024763395` during verification; `runReport` succeeds (0 rows — property has no traffic yet). Needs runtime minting in `google-analytics.service.ts`. |
 
+| `VERCEL_TEAM_TOKEN` / `VERCEL_TEAM_ID` | `.auth/env/.env.canonical` (`VERCEL_ACCESS_TOKEN` / `VERCEL_TEAM_ID` = team_MAA7dpVr2sDNuNv90AiYlo1d) | ✅ lists 6 team projects | Powers multi-site discovery (jami.studio-marketing, benefit-hunter, docs, avatar, etymalia, intercal). Added to Vercel production env 2026-08-30. |
+| `CLOUDFLARE_ZONE_ID_GARDENS` | set 2026-08-30 | ✅ zone list | `25bd4003bb586729171737d974fea793` = **mygardens.app** (no proxied traffic yet) |
+
 ## Infrastructure providers
 
 | Key | Provenance | Verified | Notes |
