@@ -15,6 +15,14 @@ const router = Router();
 
 router.use(attachUser);
 
+function requireAuth(req: Request, res: Response, next: () => void): void {
+  if (!req.user) {
+    res.status(401).json({ success: false, error: 'Sign in required' });
+    return;
+  }
+  next();
+}
+
 const UNIFIED_ACCOUNT = 'acc-unified-all';
 
 function hasGoogleSa(): boolean {
@@ -157,7 +165,7 @@ router.get('/data', async (req: Request, res: Response): Promise<void> => {
 });
 
 // POST /api/analytics/sync - Explicit synchronization trigger
-router.post('/sync', async (req: Request, res: Response): Promise<void> => {
+router.post('/sync', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const startTime = Date.now();
   try {
     const { accountId, provider, timeRange } = req.body;
