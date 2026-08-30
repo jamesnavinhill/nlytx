@@ -15,6 +15,15 @@ const router = Router();
 
 router.use(attachUser);
 
+// Mutating endpoints are for signed-in users only.
+function requireAuth(req: Request, res: Response, next: () => void): void {
+  if (!req.user) {
+    res.status(401).json({ success: false, error: 'Sign in required' });
+    return;
+  }
+  next();
+}
+
 const UNIFIED_ACCOUNT = 'infra-mesh-all';
 
 async function resolveInfraData(
@@ -23,6 +32,12 @@ async function resolveInfraData(
   timeRange: TimeRange,
   authenticated: boolean = false
 ): Promise<UnifiedInfraData> {
+  // Anonymous visitors only ever get the synthetic demo — never real instance
+  // names or live reads. (2026-08-30: the aws/cloudflare/oracle branches below
+  // served live fleet data to logged-out callers who had the account id.)
+  if (!authenticated) {
+    return generateSyntheticInfraTelemetry(provider, accountId, 'Demo Fleet', 'Global Fleet', timeRange, false);
+  }
   const accountCreds = vault.getInfraAccount(accountId);
   const account = accountCreds?.account;
   const name = account?.name || 'Infrastructure Fleet';
@@ -103,9 +118,20 @@ async function resolveInfraData(
 }
 
 // GET /api/infrastructure/accounts
+// Authenticated: real fleet inventory. Anonymous: synthetic demo names only.
 router.get('/accounts', (req: Request, res: Response) => {
   try {
     const provider = req.query.provider as InfraProviderType | undefined;
+    if (!req.user) {
+      const now = new Date().toISOString();
+      const demo = [
+        { id: 'infra-mesh-all', provider: 'unified-infra', name: 'Demo Fleet', region: 'multi-region (Global)', targetResource: 'demo-infra-mesh', hasKey: false, isLiveConnected: false, createdAt: now },
+        { id: 'demo-aws-1', provider: 'aws', name: 'Demo Compute Fleet', region: 'us-east-1', targetResource: 'demo-asg', hasKey: true, isLiveConnected: false, createdAt: now },
+        { id: 'demo-cf-infra-1', provider: 'cloudflare-infra', name: 'Demo Edge Network', region: 'global', targetResource: 'demo-cf-account', hasKey: true, isLiveConnected: false, createdAt: now },
+      ];
+      const filtered = provider && provider !== 'unified-infra' ? demo.filter((a) => a.provider === provider) : demo;
+      return res.json({ success: true, accounts: filtered });
+    }
     const accounts = vault.getInfraAccounts(provider);
     res.json({ success: true, accounts });
   } catch (e: any) {
@@ -114,7 +140,7 @@ router.get('/accounts', (req: Request, res: Response) => {
 });
 
 // POST /api/infrastructure/accounts/save
-router.post('/accounts/save', (req: Request, res: Response) => {
+router.post('/accounts/save', requireAuth, (req: Request, res: Response) => {
   try {
     const payload = req.body;
     if (!payload.provider || !payload.name) {
@@ -129,7 +155,7 @@ router.post('/accounts/save', (req: Request, res: Response) => {
 });
 
 // DELETE /api/infrastructure/accounts/:id
-router.delete('/accounts/:id', (req: Request, res: Response) => {
+router.delete('/accounts/:id', requireAuth, (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const deleted = vault.deleteInfraAccount(id);
@@ -165,7 +191,7 @@ router.get('/data', async (req: Request, res: Response) => {
 });
 
 // POST /api/infrastructure/sync
-router.post('/sync', async (req: Request, res: Response) => {
+router.post('/sync', requireAuth, async (req: Request, res: Response) => {
   try {
     const { provider = 'unified-infra', accountId = UNIFIED_ACCOUNT, timeRange = '24h' } = req.body;
     const authenticated = !!req.user;
@@ -183,7 +209,7 @@ router.post('/sync', async (req: Request, res: Response) => {
 });
 
 // POST /api/infrastructure/instance-action
-router.post('/instance-action', async (req: Request, res: Response) => {
+router.post('/instance-action', requireAuth, async (req: Request, res: Response) => {
   try {
     const { instanceId, action, provider } = req.body;
     analyticsCache.invalidate(provider);

@@ -10,17 +10,46 @@ import {
   encryptJson,
 } from '../services/db.service';
 import { attachUser } from './auth.routes';
-import { ProviderCredentialsPayload, ProviderType } from '../../src/types/analytics';
+import { ProviderAccount, ProviderCredentialsPayload, ProviderType } from '../../src/types/analytics';
 
 const router = Router();
 
 router.use(attachUser);
 
+// Mutating endpoints are for signed-in users only — anonymous demo visitors
+// never write to the vault.
+function requireAuth(req: Request, res: Response, next: () => void): void {
+  if (!req.user) {
+    res.status(401).json({ success: false, error: 'Sign in required' });
+    return;
+  }
+  next();
+}
+
 // GET /api/accounts - List sanitized accounts
-// (env-seeded + discovered Vercel sites + persisted for the logged-in user)
+// Authenticated: env-seeded + discovered Vercel sites + persisted for the user.
+// Anonymous: a fully synthetic demo sidebar — real project/zone names and ids
+// are server-side details that logged-out visitors must never see.
+function demoAccounts(provider?: ProviderType): ProviderAccount[] {
+  const now = new Date().toISOString();
+  const all: ProviderAccount[] = [
+    { id: 'acc-unified-all', provider: 'unified', name: 'Demo Workspace', targetResource: 'demo-mesh', hasKey: false, isLiveConnected: false, createdAt: now },
+    { id: 'demo-vercel-1', provider: 'vercel', name: 'Demo Storefront', targetResource: 'demo-project-1', hasKey: true, isLiveConnected: false, createdAt: now },
+    { id: 'demo-vercel-2', provider: 'vercel', name: 'Demo Docs Portal', targetResource: 'demo-project-2', hasKey: true, isLiveConnected: false, createdAt: now },
+    { id: 'demo-vercel-3', provider: 'vercel', name: 'Demo Marketing Site', targetResource: 'demo-project-3', hasKey: true, isLiveConnected: false, createdAt: now },
+    { id: 'demo-cloudflare-1', provider: 'cloudflare', name: 'Demo Zone', targetResource: 'demo-zone-1', hasKey: true, isLiveConnected: false, createdAt: now },
+    { id: 'demo-google-1', provider: 'google', name: 'Demo GA4 Property', targetResource: 'properties/demo', hasKey: true, isLiveConnected: false, createdAt: now },
+  ];
+  return provider && provider !== 'unified' ? all.filter((a) => a.provider === provider) : all;
+}
+
 router.get('/', async (req: Request, res: Response): Promise<void> => {
   try {
     const provider = req.query.provider as ProviderType | undefined;
+    if (!req.user) {
+      res.json({ success: true, accounts: demoAccounts(provider) });
+      return;
+    }
     const accounts = vault.getAccounts(provider);
     if (!provider || provider === 'unified' || provider === 'vercel') {
       // Every Vercel project visible to the configured tokens shows up as its
@@ -65,7 +94,7 @@ router.get('/', async (req: Request, res: Response): Promise<void> => {
 });
 
 // POST /api/accounts/save - Securely store credential in vault (+ persist for logged-in users)
-router.post('/save', async (req: Request, res: Response): Promise<void> => {
+router.post('/save', requireAuth, async (req: Request, res: Response): Promise<void> => {
   try {
     const payload: ProviderCredentialsPayload = req.body;
     if (!payload || !payload.provider || !payload.name) {
@@ -97,7 +126,7 @@ router.post('/save', async (req: Request, res: Response): Promise<void> => {
 });
 
 // POST /api/accounts/test-connection - Verify provider tokens
-router.post('/test-connection', async (req: Request, res: Response): Promise<void> => {
+router.post('/test-connection', requireAuth, async (req: Request, res: Response): Promise<void> => {
   try {
     const { provider, targetResource, apiKey } = req.body;
     const cleanKey = apiKey?.trim();
@@ -141,7 +170,7 @@ router.post('/test-connection', async (req: Request, res: Response): Promise<voi
 });
 
 // DELETE /api/accounts/:id - Remove account and wipe secrets
-router.delete('/:id', async (req: Request, res: Response): Promise<void> => {
+router.delete('/:id', requireAuth, async (req: Request, res: Response): Promise<void> => {
   try {
     const id = req.params.id;
     const deleted = vault.deleteAccount(id);

@@ -6,6 +6,7 @@ import {
   UnifiedAnalyticsData,
   ProviderCredentialsPayload,
 } from '../types/analytics';
+import { useAuth } from './AuthContext';
 
 export type AppCategory = 'analytics' | 'infrastructure';
 
@@ -33,6 +34,7 @@ interface AnalyticsContextType {
 const AnalyticsContext = createContext<AnalyticsContextType | undefined>(undefined);
 
 export const AnalyticsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { user } = useAuth();
   const [accounts, setAccounts] = useState<ProviderAccount[]>([]);
   const [selectedAccountId, setSelectedAccountId] = useState<string>('acc-unified-all');
   const [selectedProvider, setSelectedProvider] = useState<ProviderType>('unified');
@@ -97,6 +99,14 @@ export const AnalyticsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   useEffect(() => {
     fetchData();
   }, [selectedAccountId, selectedProvider, timeRange]);
+
+  // Auth state changes swap the entire dataset (demo ↔ live) — refetch both,
+  // otherwise a signed-out session keeps showing the pre-logout account list.
+  useEffect(() => {
+    fetchAccounts();
+    fetchData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
 
   const toggleSidebar = () => {
     setIsSidebarCollapsed(prev => !prev);

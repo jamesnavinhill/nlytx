@@ -6,6 +6,7 @@ import {
   InfraCredentialsPayload,
 } from '../types/infrastructure';
 import { TimeRange } from '../types/analytics';
+import { useAuth } from './AuthContext';
 
 interface InfrastructureContextType {
   accounts: InfraAccount[];
@@ -27,6 +28,7 @@ interface InfrastructureContextType {
 const InfrastructureContext = createContext<InfrastructureContextType | undefined>(undefined);
 
 export const InfrastructureProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { user } = useAuth();
   const [accounts, setAccounts] = useState<InfraAccount[]>([]);
   const [selectedAccountId, setSelectedAccountId] = useState<string>('infra-mesh-all');
   const [selectedProvider, setSelectedProvider] = useState<InfraProviderType>('unified-infra');
@@ -85,6 +87,14 @@ export const InfrastructureProvider: React.FC<{ children: React.ReactNode }> = (
   useEffect(() => {
     fetchData();
   }, [selectedAccountId, selectedProvider, timeRange]);
+
+  // Auth state changes swap the entire dataset (demo ↔ live) — refetch both,
+  // otherwise a signed-out session keeps showing the pre-logout account list.
+  useEffect(() => {
+    fetchAccounts();
+    fetchData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
 
   const refreshData = async () => {
     setIsSyncing(true);

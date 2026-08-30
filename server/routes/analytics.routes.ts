@@ -68,11 +68,15 @@ async function resolveAnalyticsPayload(
   timeRange: TimeRange,
   authenticated: boolean
 ): Promise<UnifiedAnalyticsData> {
-  // Unified view: demo for anonymous visitors, live rollup for signed-in users.
+  // Anonymous visitors only ever get the synthetic demo — never real account
+  // names/ids or live reads. (2026-08-30: the vsite- branch below served live
+  // per-project analytics to logged-out callers who had the id.)
+  if (!authenticated) {
+    return generateSyntheticTelemetry(provider, accountId, 'Analytics Feed', 'demo-mesh', timeRange, false);
+  }
+
+  // Unified view: live rollup for signed-in users.
   if (provider === 'unified' || accountId === UNIFIED_ACCOUNT) {
-    if (!authenticated) {
-      return generateSyntheticTelemetry('unified', accountId, 'Analytics Feed', 'unified-mesh', timeRange, false);
-    }
     return resolveUnifiedLive(timeRange);
   }
 
