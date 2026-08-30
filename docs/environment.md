@@ -14,7 +14,7 @@ The `.auth` house rule: a key earns a place in canonical env only after a live A
 
 | Key | Provenance | Verified | Notes |
 | --- | --- | --- | --- |
-| `VERCEL_BEARER_TOKEN` | Personal-account CLI token, promoted 2026-08-30 to `.auth/env/.env.canonical` as `VERCEL_JNH_TOKEN` | ✅ `GET /v9/projects/prj_M20…` → `nlytx` | Belongs to **jamesnavinhill18@gmail.com** (via device-flow `vercel login`); the app's Vercel connector uses this one. studio-jami's `VERCEL_ACCESS_TOKEN` remains in canon for that team. |
+| `VERCEL_BEARER_TOKEN` | Dashboard personal access token for **jamesnavinhill** (Full Account, No Expiration), created 2026-08-30; canon `VERCEL_JNH_TOKEN` | ✅ `/v2/user` → jamesnavinhill, 7 personal projects, web-analytics aggregate | Replaces a static `vca_` OAuth CLI token that **died at source** within a day (root cause of empty Vercel charts 2026-08-30). `vca_` access tokens are short-lived by design and `vcr_` refresh tokens rotate on every use (empirically verified — an old refresh token died within minutes of being superseded), so only dashboard-minted `vcp_` PATs may be stored in env. `POST /v3/user/tokens` refuses minting for the CLI's OAuth app ("Cannot create tokens for this app"). |
 | `VERCEL_PROJECT_ID` | `docs/roadmap/outline.md` | ✅ live read-back | `prj_M20YXbR6g9k5VzIXQfoaCnv5ihTL` = `jameshill/nlytx`, framework preset Vite |
 | `CLOUDFLARE_API_TOKEN` | `.auth/env/.env.canonical` | ✅ zone list + GraphQL + tokens/verify | No DNS-record scope (fine for analytics; blocked DNS edits during verification) |
 | `CLOUDFLARE_ACCOUNT_ID` | `.auth/env/.env.canonical` | ✅ via API | jami-studio account |
