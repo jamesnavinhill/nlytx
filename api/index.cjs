@@ -127716,12 +127716,12 @@ var require_dist_cjs19 = __commonJS({
   }
 });
 
-// api/index.ts
-var index_exports = {};
-__export(index_exports, {
+// server/api-entry.ts
+var api_entry_exports = {};
+__export(api_entry_exports, {
   default: () => handler
 });
-module.exports = __toCommonJS(index_exports);
+module.exports = __toCommonJS(api_entry_exports);
 
 // server/app.ts
 var import_express5 = __toESM(require_express2(), 1);
@@ -132171,7 +132171,7 @@ function createApiApp() {
   return app2;
 }
 
-// api/index.ts
+// server/api-entry.ts
 var app = createApiApp();
 async function handler(req, res) {
   app(req, res);
