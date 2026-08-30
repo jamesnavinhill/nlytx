@@ -131214,6 +131214,13 @@ var auth_routes_default = router;
 // server/routes/analytics.routes.ts
 var router2 = (0, import_express2.Router)();
 router2.use(attachUser);
+function requireAuth(req, res, next) {
+  if (!req.user) {
+    res.status(401).json({ success: false, error: "Sign in required" });
+    return;
+  }
+  next();
+}
 var UNIFIED_ACCOUNT = "acc-unified-all";
 function hasGoogleSa() {
   return !!process.env.GOOGLE_ANALYTICS_SA_JSON_B64 && !!process.env.GOOGLE_ANALYTICS_PROPERTY_ID;
@@ -131243,10 +131250,10 @@ async function resolveUnifiedLive(timeRange) {
   return mergeAnalyticsPayloads(parts, timeRange) ?? buildEmptyAnalyticsPayload("unified", UNIFIED_ACCOUNT, "All Accounts", "all-live-sources", timeRange);
 }
 async function resolveAnalyticsPayload(provider, accountId, timeRange, authenticated) {
+  if (!authenticated) {
+    return generateSyntheticTelemetry(provider, accountId, "Analytics Feed", "demo-mesh", timeRange, false);
+  }
   if (provider === "unified" || accountId === UNIFIED_ACCOUNT) {
-    if (!authenticated) {
-      return generateSyntheticTelemetry("unified", accountId, "Analytics Feed", "unified-mesh", timeRange, false);
-    }
     return resolveUnifiedLive(timeRange);
   }
   if (provider === "vercel" && accountId.startsWith("vsite-")) {
@@ -131313,7 +131320,7 @@ router2.get("/data", async (req, res) => {
     res.status(500).json({ success: false, error: "Internal telemetry retrieval failure" });
   }
 });
-router2.post("/sync", async (req, res) => {
+router2.post("/sync", requireAuth, async (req, res) => {
   const startTime = Date.now();
   try {
     const { accountId, provider, timeRange } = req.body;
@@ -131342,9 +131349,32 @@ var analytics_routes_default = router2;
 var import_express3 = __toESM(require_express2(), 1);
 var router3 = (0, import_express3.Router)();
 router3.use(attachUser);
+function requireAuth2(req, res, next) {
+  if (!req.user) {
+    res.status(401).json({ success: false, error: "Sign in required" });
+    return;
+  }
+  next();
+}
+function demoAccounts(provider) {
+  const now = (/* @__PURE__ */ new Date()).toISOString();
+  const all = [
+    { id: "acc-unified-all", provider: "unified", name: "Demo Workspace", targetResource: "demo-mesh", hasKey: false, isLiveConnected: false, createdAt: now },
+    { id: "demo-vercel-1", provider: "vercel", name: "Demo Storefront", targetResource: "demo-project-1", hasKey: true, isLiveConnected: false, createdAt: now },
+    { id: "demo-vercel-2", provider: "vercel", name: "Demo Docs Portal", targetResource: "demo-project-2", hasKey: true, isLiveConnected: false, createdAt: now },
+    { id: "demo-vercel-3", provider: "vercel", name: "Demo Marketing Site", targetResource: "demo-project-3", hasKey: true, isLiveConnected: false, createdAt: now },
+    { id: "demo-cloudflare-1", provider: "cloudflare", name: "Demo Zone", targetResource: "demo-zone-1", hasKey: true, isLiveConnected: false, createdAt: now },
+    { id: "demo-google-1", provider: "google", name: "Demo GA4 Property", targetResource: "properties/demo", hasKey: true, isLiveConnected: false, createdAt: now }
+  ];
+  return provider && provider !== "unified" ? all.filter((a5) => a5.provider === provider) : all;
+}
 router3.get("/", async (req, res) => {
   try {
     const provider = req.query.provider;
+    if (!req.user) {
+      res.json({ success: true, accounts: demoAccounts(provider) });
+      return;
+    }
     const accounts = vault.getAccounts(provider);
     if (!provider || provider === "unified" || provider === "vercel") {
       const sites = await listVercelSites();
@@ -131385,7 +131415,7 @@ router3.get("/", async (req, res) => {
     res.status(500).json({ success: false, error: e5.message || "Failed to list accounts" });
   }
 });
-router3.post("/save", async (req, res) => {
+router3.post("/save", requireAuth2, async (req, res) => {
   try {
     const payload2 = req.body;
     if (!payload2 || !payload2.provider || !payload2.name) {
@@ -131412,7 +131442,7 @@ router3.post("/save", async (req, res) => {
     res.status(500).json({ success: false, error: "Failed to securely store credential" });
   }
 });
-router3.post("/test-connection", async (req, res) => {
+router3.post("/test-connection", requireAuth2, async (req, res) => {
   try {
     const { provider, targetResource, apiKey } = req.body;
     const cleanKey = apiKey?.trim();
@@ -131451,7 +131481,7 @@ router3.post("/test-connection", async (req, res) => {
     res.json({ success: true, isLive: false, message: "Connection test failed (offline?)" });
   }
 });
-router3.delete("/:id", async (req, res) => {
+router3.delete("/:id", requireAuth2, async (req, res) => {
   try {
     const id = req.params.id;
     const deleted = vault.deleteAccount(id);
@@ -132266,8 +132296,18 @@ async function fetchOracleInfraAnalytics(tenancyOcid, userOcid, fingerprint, pri
 // server/routes/infrastructure.routes.ts
 var router4 = (0, import_express4.Router)();
 router4.use(attachUser);
+function requireAuth3(req, res, next) {
+  if (!req.user) {
+    res.status(401).json({ success: false, error: "Sign in required" });
+    return;
+  }
+  next();
+}
 var UNIFIED_ACCOUNT2 = "infra-mesh-all";
 async function resolveInfraData(provider, accountId, timeRange, authenticated = false) {
+  if (!authenticated) {
+    return generateSyntheticInfraTelemetry(provider, accountId, "Demo Fleet", "Global Fleet", timeRange, false);
+  }
   const accountCreds = vault.getInfraAccount(accountId);
   const account = accountCreds?.account;
   const name = account?.name || "Infrastructure Fleet";
@@ -132339,13 +132379,23 @@ async function resolveInfraData(provider, accountId, timeRange, authenticated = 
 router4.get("/accounts", (req, res) => {
   try {
     const provider = req.query.provider;
+    if (!req.user) {
+      const now = (/* @__PURE__ */ new Date()).toISOString();
+      const demo = [
+        { id: "infra-mesh-all", provider: "unified-infra", name: "Demo Fleet", region: "multi-region (Global)", targetResource: "demo-infra-mesh", hasKey: false, isLiveConnected: false, createdAt: now },
+        { id: "demo-aws-1", provider: "aws", name: "Demo Compute Fleet", region: "us-east-1", targetResource: "demo-asg", hasKey: true, isLiveConnected: false, createdAt: now },
+        { id: "demo-cf-infra-1", provider: "cloudflare-infra", name: "Demo Edge Network", region: "global", targetResource: "demo-cf-account", hasKey: true, isLiveConnected: false, createdAt: now }
+      ];
+      const filtered = provider && provider !== "unified-infra" ? demo.filter((a5) => a5.provider === provider) : demo;
+      return res.json({ success: true, accounts: filtered });
+    }
     const accounts = vault.getInfraAccounts(provider);
     res.json({ success: true, accounts });
   } catch (e5) {
     res.status(500).json({ success: false, error: e5.message || "Failed to list infra accounts" });
   }
 });
-router4.post("/accounts/save", (req, res) => {
+router4.post("/accounts/save", requireAuth3, (req, res) => {
   try {
     const payload2 = req.body;
     if (!payload2.provider || !payload2.name) {
@@ -132358,7 +132408,7 @@ router4.post("/accounts/save", (req, res) => {
     res.status(500).json({ success: false, error: e5.message || "Failed to save infra account" });
   }
 });
-router4.delete("/accounts/:id", (req, res) => {
+router4.delete("/accounts/:id", requireAuth3, (req, res) => {
   try {
     const { id } = req.params;
     const deleted = vault.deleteInfraAccount(id);
@@ -132387,7 +132437,7 @@ router4.get("/data", async (req, res) => {
     res.status(500).json({ success: false, error: e5.message || "Failed to fetch infrastructure telemetry" });
   }
 });
-router4.post("/sync", async (req, res) => {
+router4.post("/sync", requireAuth3, async (req, res) => {
   try {
     const { provider = "unified-infra", accountId = UNIFIED_ACCOUNT2, timeRange = "24h" } = req.body;
     const authenticated = !!req.user;
@@ -132401,7 +132451,7 @@ router4.post("/sync", async (req, res) => {
     res.status(500).json({ success: false, error: e5.message || "Failed to sync infrastructure telemetry" });
   }
 });
-router4.post("/instance-action", async (req, res) => {
+router4.post("/instance-action", requireAuth3, async (req, res) => {
   try {
     const { instanceId, action, provider } = req.body;
     analyticsCache.invalidate(provider);
