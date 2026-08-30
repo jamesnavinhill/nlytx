@@ -67,45 +67,27 @@ class CredentialVault {
   private seedDefaultAccounts() {
     const vercelEnvKey = process.env.VERCEL_BEARER_TOKEN?.trim();
     const cfEnvKey = process.env.CLOUDFLARE_API_TOKEN?.trim();
-    const cfZoneId = process.env.CLOUDFLARE_ZONE_ID?.trim() || 'zone_38f9024b11e8';
     const gaPropertyId = process.env.GOOGLE_ANALYTICS_PROPERTY_ID?.trim() || 'properties/314159265';
     const gaApiKey = process.env.GOOGLE_ANALYTICS_API_KEY?.trim();
+
+    // One Cloudflare account per managed zone
+    const cfZones = [
+      { id: 'acc-cf-apex', name: 'navinhill.com', zoneId: process.env.CLOUDFLARE_ZONE_ID?.trim() || '' },
+      { id: 'acc-cf-jami', name: 'jami.studio', zoneId: process.env.CLOUDFLARE_ZONE_ID_JAMI?.trim() || '' },
+      { id: 'acc-cf-gardens', name: 'mygardens.app', zoneId: process.env.CLOUDFLARE_ZONE_ID_GARDENS?.trim() || '' },
+    ].filter((z) => z.zoneId && !z.zoneId.startsWith('zone_'));
 
     const defaultAccounts: { account: ProviderAccount; apiKey?: string; apiSecret?: string }[] = [
       {
         account: {
           id: 'acc-unified-all',
           provider: 'unified',
-          name: 'Global Network Mesh',
+          name: 'Unified Mesh',
           targetResource: 'all-connected-nodes',
           hasKey: false,
           isLiveConnected: false,
           createdAt: new Date().toISOString(),
         },
-      },
-      {
-        account: {
-          id: 'acc-vercel-edge',
-          provider: 'vercel',
-          name: 'Primary Edge App',
-          targetResource: process.env.VERCEL_PROJECT_ID?.trim() || 'prj_prod_edge_frontend',
-          hasKey: !!vercelEnvKey,
-          isLiveConnected: !!vercelEnvKey,
-          createdAt: new Date().toISOString(),
-        },
-        apiKey: vercelEnvKey,
-      },
-      {
-        account: {
-          id: 'acc-cf-apex',
-          provider: 'cloudflare',
-          name: 'Production CDN Zone',
-          targetResource: cfZoneId,
-          hasKey: !!cfEnvKey,
-          isLiveConnected: !!cfEnvKey,
-          createdAt: new Date().toISOString(),
-        },
-        apiKey: cfEnvKey,
       },
       {
         account: {
@@ -119,6 +101,18 @@ class CredentialVault {
         },
         apiKey: gaApiKey,
       },
+      ...cfZones.map((z) => ({
+        account: {
+          id: z.id,
+          provider: 'cloudflare' as const,
+          name: z.name,
+          targetResource: z.zoneId,
+          hasKey: !!cfEnvKey,
+          isLiveConnected: !!cfEnvKey,
+          createdAt: new Date().toISOString(),
+        },
+        apiKey: cfEnvKey,
+      })),
     ];
 
     for (const item of defaultAccounts) {

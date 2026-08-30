@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { vault } from '../services/credential-vault.service';
 import { fetchVercelAnalytics } from '../services/vercel.service';
+import { listVercelSites, findVercelSite } from '../services/vercel-sites.service';
 import { fetchCloudflareAnalytics } from '../services/cloudflare.service';
 import { fetchGoogleAnalytics } from '../services/google-analytics.service';
 import { generateSyntheticTelemetry } from '../services/telemetry-generator.service';
@@ -32,21 +33,16 @@ function hasCfZoneAnalytics(): boolean {
 async function resolveUnifiedLive(timeRange: TimeRange): Promise<UnifiedAnalyticsData> {
   const jobs: Promise<UnifiedAnalyticsData>[] = [];
 
-  const vercel = vault.getAccount('acc-vercel-edge');
-  if (vercel?.apiKey) {
-    jobs.push(fetchVercelAnalytics(vercel.apiKey, vercel.account.targetResource, timeRange, vercel.account.name, vercel.account.id));
+  // Every discovered Vercel site contributes its own live series
+  const sites = await listVercelSites();
+  for (const site of sites) {
+    jobs.push(fetchVercelAnalytics(site, site.projectId, timeRange, site.name, site.accountId));
   }
 
-  const cf = vault.getAccount('acc-cf-apex');
-  if (cf?.apiKey || hasCfZoneAnalytics()) {
-    // Roll up every configured zone (navinhill.com + jami.studio, etc.)
-    const zones = [process.env.CLOUDFLARE_ZONE_ID, process.env.CLOUDFLARE_ZONE_ID_JAMI]
-      .map((z) => z?.trim() || '')
-      .filter((z) => z && !z.startsWith('zone_'));
-    const cfName = cf?.account.name ?? 'Cloudflare';
-    for (const zoneId of zones.length ? zones : []) {
-      jobs.push(fetchCloudflareAnalytics('', zoneId, timeRange, cfName, 'acc-cf-apex'));
-    }
+  // Every seeded Cloudflare zone (navinhill.com, jami.studio, mygardens.app)
+  const cfAccounts = vault.getAccounts('cloudflare');
+  for (const cf of cfAccounts) {
+    jobs.push(fetchCloudflareAnalytics('', cf.targetResource, timeRange, cf.name, cf.id));
   }
 
   if (hasGoogleSa()) {
@@ -80,6 +76,15 @@ async function resolveAnalyticsPayload(
     return resolveUnifiedLive(timeRange);
   }
 
+  // Discovered Vercel sites (one account per project across both Vercel contexts)
+  if (provider === 'vercel' && accountId.startsWith('vsite-')) {
+    const site = await findVercelSite(accountId);
+    if (site) {
+      return fetchVercelAnalytics(site, site.projectId, timeRange, site.name, accountId);
+    }
+    return buildEmptyAnalyticsPayload('vercel', accountId, 'Unknown Site', '', timeRange);
+  }
+
   const stored = vault.getAccount(accountId);
   const targetResource = stored?.account.targetResource || 'unified-mesh';
   const accountName = stored?.account.name || 'Analytics Feed';
@@ -88,8 +93,8 @@ async function resolveAnalyticsPayload(
   if (provider === 'vercel' && stored?.apiKey) {
     return fetchVercelAnalytics(stored.apiKey, targetResource, timeRange, accountName, accountId);
   }
-  if (provider === 'cloudflare' && stored?.apiKey) {
-    return fetchCloudflareAnalytics(stored.apiKey, targetResource, timeRange, accountName, accountId);
+  if (provider === 'cloudflare' && (stored?.apiKey || hasCfZoneAnalytics())) {
+    return fetchCloudflareAnalytics('', targetResource, timeRange, accountName, accountId);
   }
   if (provider === 'google' && hasGoogleSa()) {
     return fetchGoogleAnalytics(stored?.apiKey ?? '', targetResource, timeRange, accountName, accountId);

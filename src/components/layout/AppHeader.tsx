@@ -4,6 +4,15 @@ import { useInfrastructure } from '../../context/InfrastructureContext';
 import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
 import { Button } from '../ui/button';
+import { Avatar, AvatarFallback } from '../ui/avatar';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '../ui/dropdown-menu';
 import { SettingsDialog } from '../settings/SettingsDialog';
 import { LoginDialog } from '../auth/LoginDialog';
 import { TimeRange } from '../../types/analytics';
@@ -13,7 +22,7 @@ import {
   RefreshCw,
   Sun,
   Moon,
-  SlidersHorizontal,
+  Settings,
   LogIn,
   LogOut,
 } from 'lucide-react';
@@ -55,6 +64,8 @@ export const AppHeader: React.FC = () => {
     { id: '90d', label: '90D' },
   ];
 
+  const initials = user ? user.email.slice(0, 2).toUpperCase() : '';
+
   return (
     <header className="h-11 border-b border-border bg-card px-2 sm:px-3 flex items-center justify-between select-none z-40 relative">
       {/* Left: Sidebar Toggle */}
@@ -74,7 +85,7 @@ export const AppHeader: React.FC = () => {
         </Button>
       </div>
 
-      {/* Right: Functional Controls (Time Range, Refresh, Theme Toggle, Settings) */}
+      {/* Right: Functional Controls (Time Range, Refresh, Theme Toggle, Profile) */}
       <div className="flex items-center space-x-1.5 sm:space-x-2">
         {/* Time range selector */}
         <div className="flex items-center border border-border bg-secondary/60 rounded-[2px] p-0.5 space-x-0.5 font-mono text-[10px]">
@@ -120,40 +131,57 @@ export const AppHeader: React.FC = () => {
           )}
         </Button>
 
-        {/* Auth / Account */}
-        {user ? (
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={() => logout()}
-            tooltip={`Log out ${user.email}`}
-            className="hover:bg-secondary text-muted-foreground hover:text-foreground h-8 max-w-40 gap-1 px-2"
-          >
-            <LogOut className="h-3.5 w-3.5 shrink-0" />
-            <span className="font-mono text-[10px] truncate">{user.email}</span>
-          </Button>
-        ) : (
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={() => setLoginOpen(true)}
-            tooltip="Log in to persist accounts"
-            className="hover:bg-secondary text-muted-foreground hover:text-foreground h-8 w-8"
-          >
-            <LogIn className="h-3.5 w-3.5" />
-          </Button>
-        )}
-
-        {/* Settings Matrix */}
-        <Button
-          size="sm"
-          variant="ghost"
-          onClick={() => setSettingsOpen(true)}
-          tooltip="Settings & Credentials Matrix"
-          className="hover:bg-secondary text-muted-foreground hover:text-foreground h-8 w-8"
-        >
-          <SlidersHorizontal className="h-3.5 w-3.5" />
-        </Button>
+        {/* Profile avatar menu: login/logout + settings */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              className="h-8 w-8 rounded-full flex items-center justify-center border border-border bg-secondary/60 hover:bg-secondary transition-colors cursor-pointer focus:outline-none focus-visible:ring-1 focus-visible:ring-primary"
+              aria-label="Account menu"
+            >
+              {user ? (
+                <Avatar className="h-6 w-6">
+                  <AvatarFallback className="font-mono text-[9px] bg-primary text-primary-foreground rounded-full">
+                    {initials}
+                  </AvatarFallback>
+                </Avatar>
+              ) : (
+                <LogIn className="h-3.5 w-3.5 text-muted-foreground" />
+              )}
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-48 font-mono text-xs">
+            {user ? (
+              <>
+                <DropdownMenuLabel className="text-[10px] truncate">{user.email}</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => setSettingsOpen(true)} className="cursor-pointer">
+                  <Settings className="h-3.5 w-3.5 mr-2" />
+                  Settings
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => logout()} className="cursor-pointer">
+                  <LogOut className="h-3.5 w-3.5 mr-2" />
+                  Log Out
+                </DropdownMenuItem>
+              </>
+            ) : (
+              <>
+                <DropdownMenuLabel className="text-[10px] text-muted-foreground">
+                  Browsing as guest
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => setSettingsOpen(true)} className="cursor-pointer">
+                  <Settings className="h-3.5 w-3.5 mr-2" />
+                  Settings
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setLoginOpen(true)} className="cursor-pointer">
+                  <LogIn className="h-3.5 w-3.5 mr-2" />
+                  Log In
+                </DropdownMenuItem>
+              </>
+            )}
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
       <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />

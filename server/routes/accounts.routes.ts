@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { vault } from '../services/credential-vault.service';
 import { analyticsCache } from '../services/cache.service';
+import { listVercelSites } from '../services/vercel-sites.service';
 import {
   initSchema,
   saveUserAccount,
@@ -15,11 +16,30 @@ const router = Router();
 
 router.use(attachUser);
 
-// GET /api/accounts - List sanitized accounts (env-seeded + persisted for the logged-in user)
+// GET /api/accounts - List sanitized accounts
+// (env-seeded + discovered Vercel sites + persisted for the logged-in user)
 router.get('/', async (req: Request, res: Response): Promise<void> => {
   try {
     const provider = req.query.provider as ProviderType | undefined;
     const accounts = vault.getAccounts(provider);
+    if (!provider || provider === 'unified' || provider === 'vercel') {
+      // Every Vercel project visible to the configured tokens shows up as its
+      // own site entry — analytics-enabled or not.
+      const sites = await listVercelSites();
+      const seen = new Set(accounts.map((a) => a.id));
+      for (const s of sites) {
+        if (seen.has(s.accountId)) continue;
+        accounts.push({
+          id: s.accountId,
+          provider: 'vercel',
+          name: s.name,
+          targetResource: s.projectId,
+          hasKey: true,
+          isLiveConnected: true,
+          createdAt: s.createdAt,
+        });
+      }
+    }
     if (req.user) {
       await initSchema();
       const persisted = await getUserAccounts(req.user.id);

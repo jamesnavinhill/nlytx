@@ -20889,7 +20889,7 @@ var require_application = __commonJS({
     };
     app2.del = deprecate.function(app2.delete, "app.del: Use app.delete instead");
     app2.render = function render(name, options, callback) {
-      var cache5 = this.cache;
+      var cache6 = this.cache;
       var done = callback;
       var engines = this.engines;
       var opts = options;
@@ -20908,7 +20908,7 @@ var require_application = __commonJS({
         renderOptions.cache = this.enabled("view cache");
       }
       if (renderOptions.cache) {
-        view2 = cache5[name];
+        view2 = cache6[name];
       }
       if (!view2) {
         var View2 = this.get("view");
@@ -20924,7 +20924,7 @@ var require_application = __commonJS({
           return done(err);
         }
         if (renderOptions.cache) {
-          cache5[name] = view2;
+          cache6[name] = view2;
         }
       }
       tryRender(view2, renderOptions, done);
@@ -38830,9 +38830,9 @@ function loadCborStructIterator(ns) {
   for (let i5 = 0; i5 < memberNames.length; ++i5) {
     encodedKeys[i5] = encodeCborStringKey(memberNames[i5]);
   }
-  const cache5 = { memberNames, memberSchemas, encodedKeys };
-  schema[CBOR_STRUCT_CACHE] = cache5;
-  return cache5;
+  const cache6 = { memberNames, memberSchemas, encodedKeys };
+  schema[CBOR_STRUCT_CACHE] = cache6;
+  return cache6;
 }
 function encodeCborStringKey(s2) {
   let utf8Bytes;
@@ -38997,8 +38997,8 @@ function writeStruct(ns, value, serdeContext) {
     }
     return;
   }
-  const cache5 = loadCborStructIterator(ns);
-  const { memberNames, memberSchemas, encodedKeys } = cache5;
+  const cache6 = loadCborStructIterator(ns);
+  const { memberNames, memberSchemas, encodedKeys } = cache6;
   const z = memberNames.length;
   let headerSize;
   if (z < 24) {
@@ -39464,8 +39464,8 @@ function readMap(ns) {
 }
 function readStruct(ns, count, startPos) {
   const isUnion = ns.isUnionSchema();
-  const cache5 = loadCborStructIterator(ns);
-  const { memberSchemas, encodedKeys, memberNames } = cache5;
+  const cache6 = loadCborStructIterator(ns);
+  const { memberSchemas, encodedKeys, memberNames } = cache6;
   const z = encodedKeys.length;
   const result = {};
   let unknownKey;
@@ -39648,8 +39648,8 @@ function readListIndefinite(ns) {
 function readMapIndefinite(ns) {
   pos += 1;
   if (ns.isStructSchema()) {
-    const cache5 = loadCborStructIterator(ns);
-    const { memberSchemas, encodedKeys, memberNames } = cache5;
+    const cache6 = loadCborStructIterator(ns);
+    const { memberSchemas, encodedKeys, memberNames } = cache6;
     const z = encodedKeys.length;
     const isUnion = ns.isUnionSchema();
     const result = {};
@@ -43798,18 +43798,18 @@ var init_bdd = __esm({
 });
 
 // node_modules/@aws-sdk/nested-clients/dist-es/submodules/sso-oidc/endpoint/endpointResolver.js
-var cache, defaultEndpointResolver;
+var cache2, defaultEndpointResolver;
 var init_endpointResolver = __esm({
   "node_modules/@aws-sdk/nested-clients/dist-es/submodules/sso-oidc/endpoint/endpointResolver.js"() {
     init_client3();
     init_endpoints();
     init_bdd();
-    cache = new EndpointCache({
+    cache2 = new EndpointCache({
       size: 50,
       params: ["Endpoint", "Region", "UseDualStack", "UseFIPS"]
     });
     defaultEndpointResolver = (endpointParams, context = {}) => {
-      return cache.get(endpointParams, () => decideEndpoint(bdd, {
+      return cache2.get(endpointParams, () => decideEndpoint(bdd, {
         endpointParams,
         logger: context.logger
       }));
@@ -44865,18 +44865,18 @@ var init_bdd2 = __esm({
 });
 
 // node_modules/@aws-sdk/nested-clients/dist-es/submodules/sso/endpoint/endpointResolver.js
-var cache2, defaultEndpointResolver2;
+var cache3, defaultEndpointResolver2;
 var init_endpointResolver2 = __esm({
   "node_modules/@aws-sdk/nested-clients/dist-es/submodules/sso/endpoint/endpointResolver.js"() {
     init_client3();
     init_endpoints();
     init_bdd2();
-    cache2 = new EndpointCache({
+    cache3 = new EndpointCache({
       size: 50,
       params: ["Endpoint", "Region", "UseDualStack", "UseFIPS"]
     });
     defaultEndpointResolver2 = (endpointParams, context = {}) => {
-      return cache2.get(endpointParams, () => decideEndpoint(bdd2, {
+      return cache3.get(endpointParams, () => decideEndpoint(bdd2, {
         endpointParams,
         logger: context.logger
       }));
@@ -45869,18 +45869,18 @@ var init_bdd3 = __esm({
 });
 
 // node_modules/@aws-sdk/nested-clients/dist-es/submodules/sts/endpoint/endpointResolver.js
-var cache3, defaultEndpointResolver3;
+var cache4, defaultEndpointResolver3;
 var init_endpointResolver3 = __esm({
   "node_modules/@aws-sdk/nested-clients/dist-es/submodules/sts/endpoint/endpointResolver.js"() {
     init_client3();
     init_endpoints();
     init_bdd3();
-    cache3 = new EndpointCache({
+    cache4 = new EndpointCache({
       size: 50,
       params: ["Endpoint", "Region", "UseDualStack", "UseFIPS", "UseGlobalEndpoint"]
     });
     defaultEndpointResolver3 = (endpointParams, context = {}) => {
-      return cache3.get(endpointParams, () => decideEndpoint(bdd3, {
+      return cache4.get(endpointParams, () => decideEndpoint(bdd3, {
         endpointParams,
         logger: context.logger
       }));
@@ -47194,18 +47194,18 @@ var init_bdd4 = __esm({
 });
 
 // node_modules/@aws-sdk/nested-clients/dist-es/submodules/signin/endpoint/endpointResolver.js
-var cache4, defaultEndpointResolver4;
+var cache5, defaultEndpointResolver4;
 var init_endpointResolver4 = __esm({
   "node_modules/@aws-sdk/nested-clients/dist-es/submodules/signin/endpoint/endpointResolver.js"() {
     init_client3();
     init_endpoints();
     init_bdd4();
-    cache4 = new EndpointCache({
+    cache5 = new EndpointCache({
       size: 50,
       params: ["Endpoint", "IsControlPlane", "IsOAuthEndpoint", "Region", "UseDualStack", "UseFIPS"]
     });
     defaultEndpointResolver4 = (endpointParams, context = {}) => {
-      return cache4.get(endpointParams, () => decideEndpoint(bdd4, {
+      return cache5.get(endpointParams, () => decideEndpoint(bdd4, {
         endpointParams,
         logger: context.logger
       }));
@@ -48926,12 +48926,12 @@ var require_dist_cjs17 = __commonJS({
       r5 + 3
     ]);
     var bdd5 = BinaryDecisionDiagram2.from(nodes5, root5, _data5.conditions, _data5.results);
-    var cache5 = new EndpointCache2({
+    var cache6 = new EndpointCache2({
       size: 50,
       params: ["Endpoint", "Region", "UseDualStack", "UseFIPS"]
     });
     var defaultEndpointResolver5 = (endpointParams, context = {}) => {
-      return cache5.get(endpointParams, () => decideEndpoint2(bdd5, {
+      return cache6.get(endpointParams, () => decideEndpoint2(bdd5, {
         endpointParams,
         logger: context.logger
       }));
@@ -124172,12 +124172,12 @@ var require_dist_cjs19 = __commonJS({
       r5 + 3
     ]);
     var bdd5 = BinaryDecisionDiagram2.from(nodes5, root5, _data5.conditions, _data5.results);
-    var cache5 = new EndpointCache2({
+    var cache6 = new EndpointCache2({
       size: 50,
       params: ["Endpoint", "Region", "UseDualStack", "UseFIPS"]
     });
     var defaultEndpointResolver5 = (endpointParams, context = {}) => {
-      return cache5.get(endpointParams, () => decideEndpoint2(bdd5, {
+      return cache6.get(endpointParams, () => decideEndpoint2(bdd5, {
         endpointParams,
         logger: context.logger
       }));
@@ -127772,44 +127772,24 @@ var CredentialVault = class {
   seedDefaultAccounts() {
     const vercelEnvKey = process.env.VERCEL_BEARER_TOKEN?.trim();
     const cfEnvKey = process.env.CLOUDFLARE_API_TOKEN?.trim();
-    const cfZoneId = process.env.CLOUDFLARE_ZONE_ID?.trim() || "zone_38f9024b11e8";
     const gaPropertyId = process.env.GOOGLE_ANALYTICS_PROPERTY_ID?.trim() || "properties/314159265";
     const gaApiKey = process.env.GOOGLE_ANALYTICS_API_KEY?.trim();
+    const cfZones = [
+      { id: "acc-cf-apex", name: "navinhill.com", zoneId: process.env.CLOUDFLARE_ZONE_ID?.trim() || "" },
+      { id: "acc-cf-jami", name: "jami.studio", zoneId: process.env.CLOUDFLARE_ZONE_ID_JAMI?.trim() || "" },
+      { id: "acc-cf-gardens", name: "mygardens.app", zoneId: process.env.CLOUDFLARE_ZONE_ID_GARDENS?.trim() || "" }
+    ].filter((z) => z.zoneId && !z.zoneId.startsWith("zone_"));
     const defaultAccounts = [
       {
         account: {
           id: "acc-unified-all",
           provider: "unified",
-          name: "Global Network Mesh",
+          name: "Unified Mesh",
           targetResource: "all-connected-nodes",
           hasKey: false,
           isLiveConnected: false,
           createdAt: (/* @__PURE__ */ new Date()).toISOString()
         }
-      },
-      {
-        account: {
-          id: "acc-vercel-edge",
-          provider: "vercel",
-          name: "Primary Edge App",
-          targetResource: process.env.VERCEL_PROJECT_ID?.trim() || "prj_prod_edge_frontend",
-          hasKey: !!vercelEnvKey,
-          isLiveConnected: !!vercelEnvKey,
-          createdAt: (/* @__PURE__ */ new Date()).toISOString()
-        },
-        apiKey: vercelEnvKey
-      },
-      {
-        account: {
-          id: "acc-cf-apex",
-          provider: "cloudflare",
-          name: "Production CDN Zone",
-          targetResource: cfZoneId,
-          hasKey: !!cfEnvKey,
-          isLiveConnected: !!cfEnvKey,
-          createdAt: (/* @__PURE__ */ new Date()).toISOString()
-        },
-        apiKey: cfEnvKey
       },
       {
         account: {
@@ -127822,7 +127802,19 @@ var CredentialVault = class {
           createdAt: (/* @__PURE__ */ new Date()).toISOString()
         },
         apiKey: gaApiKey
-      }
+      },
+      ...cfZones.map((z) => ({
+        account: {
+          id: z.id,
+          provider: "cloudflare",
+          name: z.name,
+          targetResource: z.zoneId,
+          hasKey: !!cfEnvKey,
+          isLiveConnected: !!cfEnvKey,
+          createdAt: (/* @__PURE__ */ new Date()).toISOString()
+        },
+        apiKey: cfEnvKey
+      }))
     ];
     for (const item of defaultAccounts) {
       this.store.set(item.account.id, {
@@ -128187,115 +128179,132 @@ function timeRangeWindow(timeRange) {
 
 // server/services/vercel.service.ts
 var API = "https://api.vercel.com";
-function teamQuery() {
-  return process.env.VERCEL_TEAM_ID ? `&teamId=${process.env.VERCEL_TEAM_ID}` : "";
-}
-function rate(value, unit, good, poor) {
-  return { value: parseFloat(value.toFixed(unit === "" ? 3 : 0)), unit, rating: value <= good ? "good" : value <= poor ? "needs-improvement" : "poor" };
-}
-function mapVitals(v) {
-  const num = (x) => typeof x === "number" ? x : typeof x?.value === "number" ? x.value : typeof x?.p75 === "number" ? x.p75 : 0;
-  return {
-    lcp: rate(num(v?.lcp) || 0, "ms", 2500, 4e3),
-    cls: rate(num(v?.cls) || 0, "", 0.1, 0.25),
-    inp: rate(num(v?.inp) || num(v?.fid) || 0, "ms", 200, 500),
-    fid: rate(num(v?.fid) || 0, "ms", 100, 300),
-    ttfb: rate(num(v?.ttfb) || 0, "ms", 800, 1800)
-  };
-}
-function seriesTotal(s2) {
-  if (!s2) return 0;
-  if (typeof s2.total === "number") return s2.total;
-  return (s2.data ?? []).reduce((a5, p3) => a5 + (p3.y ?? 0), 0);
-}
-async function fetchVercelAnalytics(token, projectId, timeRange, accountName, accountId) {
-  const targetId = projectId?.trim() || "";
-  if (!token || token.trim().length === 0 || !targetId || !targetId.startsWith("prj_")) {
-    return generateSyntheticTelemetry("vercel", accountId, accountName, targetId, timeRange, false);
+async function fetchVercelAnalytics(tokenOrSite, projectIdOrFallback, timeRange, accountName, accountId) {
+  const site = typeof tokenOrSite === "object" ? tokenOrSite : void 0;
+  const token = (typeof tokenOrSite === "object" ? tokenOrSite.token : tokenOrSite)?.trim();
+  const projectId = (site ? site.projectId : projectIdOrFallback)?.trim();
+  const teamId = site?.teamId;
+  const displayName = site?.name ?? accountName;
+  if (!token || !projectId || !projectId.startsWith("prj_")) {
+    return generateSyntheticTelemetry("vercel", accountId, displayName, projectId, timeRange, false);
   }
   try {
-    const headers = {
-      Authorization: `Bearer ${token.trim()}`,
-      "Content-Type": "application/json"
-    };
     const win = timeRangeWindow(timeRange);
-    const projectRes = await fetch(`${API}/v9/projects/${encodeURIComponent(targetId)}?${teamQuery().slice(1)}`, {
-      headers,
-      signal: AbortSignal.timeout(8e3)
-    });
-    if (!projectRes.ok) {
-      return generateSyntheticTelemetry("vercel", accountId, accountName, targetId, timeRange, false);
+    const earliestAllowed = Date.now() - 30 * 24 * 60 * 60 * 1e3;
+    const sinceMs = Math.max(Date.now() - win.days * 2 * 24 * 60 * 60 * 1e3, earliestAllowed);
+    const since2x = new Date(sinceMs).toISOString();
+    const aggregate = async (sinceIso) => {
+      const qs = new URLSearchParams({
+        projectId,
+        since: sinceIso,
+        until: new Date(win.untilMs).toISOString(),
+        by: "day",
+        limit: String(Math.max(win.days * 2 + 1, 31))
+      });
+      if (teamId) qs.set("teamId", teamId);
+      const res = await fetch(`${API}/v1/query/web-analytics/visits/aggregate?${qs.toString()}`, {
+        headers: { Authorization: `Bearer ${token}` },
+        signal: AbortSignal.timeout(12e3)
+      });
+      if (!res.ok) {
+        return { rows: [], authed: res.ok };
+      }
+      const json = await res.json();
+      return { rows: json.data ?? [], authed: true };
+    };
+    const cur = await aggregate(since2x);
+    if (!cur.authed && cur.rows.length === 0) {
+      const payload3 = buildEmptyAnalyticsPayload("vercel", accountId, displayName, projectId, timeRange);
+      return payload3;
     }
-    const project = await projectRes.json();
-    const projectName = project.name || accountName;
-    const payload2 = buildEmptyAnalyticsPayload("vercel", accountId, projectName, targetId, timeRange);
+    const startBoundary = new Date(Date.now() - win.days * 24 * 60 * 60 * 1e3).toISOString().slice(0, 10);
+    const curRows = cur.rows.filter((r5) => r5.timestamp.slice(0, 10) >= startBoundary);
+    const prevRows = cur.rows.filter((r5) => r5.timestamp.slice(0, 10) < startBoundary);
+    const payload2 = buildEmptyAnalyticsPayload("vercel", accountId, displayName, projectId, timeRange);
     payload2.isLive = true;
-    const qs = `projectId=${encodeURIComponent(targetId)}&since=${win.sinceMs}&until=${win.untilMs}${teamQuery()}`;
-    try {
-      const statsRes = await fetch(`${API}/v1/web/analytics/stats?${qs}`, { headers, signal: AbortSignal.timeout(12e3) });
-      if (statsRes.ok) {
-        const stats = await statsRes.json();
-        const views = stats?.views;
-        const visitors = stats?.visitors;
-        const daily = {};
-        for (const p3 of views?.data ?? []) {
-          const day = new Date(p3.x).toISOString().split("T")[0];
-          daily[day] = { views: (daily[day]?.views ?? 0) + (p3.y ?? 0), visitors: daily[day]?.visitors ?? 0 };
-        }
-        for (const p3 of visitors?.data ?? []) {
-          const day = new Date(p3.x).toISOString().split("T")[0];
-          daily[day] = { views: daily[day]?.views ?? 0, visitors: (daily[day]?.visitors ?? 0) + (p3.y ?? 0) };
-        }
-        payload2.timeSeries = Object.entries(daily).sort(([a5], [b6]) => a5.localeCompare(b6)).map(([day, v]) => ({
-          timestamp: (/* @__PURE__ */ new Date(`${day}T00:00:00Z`)).toISOString(),
-          formattedTime: (/* @__PURE__ */ new Date(`${day}T00:00:00Z`)).toLocaleDateString([], { month: "short", day: "numeric" }),
-          visitors: v.visitors,
-          pageviews: v.views,
-          requests: v.views,
-          bandwidthMb: 0,
-          cacheHits: 0,
-          errors: 0
-        }));
-        payload2.summary.totalPageviews = seriesTotal(views);
-        payload2.summary.totalVisitors = seriesTotal(visitors);
-        payload2.summary.requestCount = seriesTotal(views);
-        payload2.summary.bounceRate = typeof stats?.bounces?.total === "number" ? parseFloat((stats.bounces.total * 100).toFixed(1)) : 0;
-      }
-    } catch (e5) {
-      console.warn("[Vercel Service] analytics stats unavailable:", e5);
-    }
-    try {
-      const pathsRes = await fetch(`${API}/v1/web/analytics/top-paths?${qs}&limit=10`, { headers, signal: AbortSignal.timeout(12e3) });
-      if (pathsRes.ok) {
-        const pathsJson = await pathsRes.json();
-        const rows = pathsJson?.topPaths ?? pathsJson?.paths ?? [];
-        payload2.topPaths = rows.slice(0, 10).map((r5) => ({
-          path: r5.path ?? r5.href ?? r5.name ?? "(unknown)",
-          views: r5.total ?? r5.views ?? r5.count ?? 0,
-          uniqueVisitors: r5.visitors ?? r5.uniqueVisitors ?? 0,
-          avgDurationSec: Math.round(r5.duration ?? r5.avgDuration ?? 0),
-          bounceRate: typeof r5.bounceRate === "number" ? parseFloat((r5.bounceRate * 100).toFixed(1)) : 0
-        }));
-      }
-    } catch (e5) {
-      console.warn("[Vercel Service] top paths unavailable:", e5);
-    }
-    try {
-      const insightsRes = await fetch(`${API}/v1/web/insights/stats?${qs}`, { headers, signal: AbortSignal.timeout(12e3) });
-      if (insightsRes.ok) {
-        const insights = await insightsRes.json();
-        if (insights?.vitals) {
-          payload2.webVitals = mapVitals(insights.vitals);
-        }
-      }
-    } catch (e5) {
-      console.warn("[Vercel Service] insights unavailable:", e5);
-    }
+    payload2.timeSeries = curRows.map((r5) => {
+      const d5 = new Date(r5.timestamp);
+      return {
+        timestamp: d5.toISOString(),
+        formattedTime: d5.toLocaleDateString([], { month: "short", day: "numeric" }),
+        visitors: r5.visitors ?? 0,
+        pageviews: r5.pageviews ?? 0,
+        requests: r5.pageviews ?? 0,
+        bandwidthMb: 0,
+        cacheHits: 0,
+        errors: 0
+      };
+    });
+    const sumVisitors = (rows) => rows.reduce((a5, r5) => a5 + (r5.visitors ?? 0), 0);
+    const sumPv = (rows) => rows.reduce((a5, r5) => a5 + (r5.pageviews ?? 0), 0);
+    const curV = sumVisitors(curRows);
+    const curPv = sumPv(curRows);
+    const prevV = sumVisitors(prevRows);
+    const prevPv = sumPv(prevRows);
+    payload2.summary.totalVisitors = curV;
+    payload2.summary.totalPageviews = curPv;
+    payload2.summary.requestCount = curPv;
+    payload2.summary.visitorsChange = prevV > 0 ? parseFloat(((curV - prevV) / prevV * 100).toFixed(1)) : 0;
+    payload2.summary.pageviewsChange = prevPv > 0 ? parseFloat(((curPv - prevPv) / prevPv * 100).toFixed(1)) : 0;
     return payload2;
   } catch (error2) {
-    console.error("[Vercel Service] API request failure:", error2);
-    return generateSyntheticTelemetry("vercel", accountId, accountName, targetId, timeRange, false);
+    console.error("[Vercel Service] query failure:", error2);
+    return generateSyntheticTelemetry("vercel", accountId, displayName, projectId, timeRange, false);
   }
+}
+
+// server/services/vercel-sites.service.ts
+var cache = null;
+async function listProjects(token, teamId) {
+  const out = [];
+  let url = `https://api.vercel.com/v9/projects?limit=100${teamId ? `&teamId=${encodeURIComponent(teamId)}` : ""}`;
+  for (let page = 0; page < 5; page++) {
+    const res = await fetch(url, {
+      headers: { Authorization: `Bearer ${token}` },
+      signal: AbortSignal.timeout(1e4)
+    });
+    if (!res.ok) return out;
+    const json = await res.json();
+    for (const p3 of json.projects ?? []) out.push({ id: p3.id, name: p3.name, createdAt: p3.createdAt });
+    const next = json.pagination?.next;
+    if (!next) break;
+    url = `https://api.vercel.com/v9/projects?limit=100&until=${encodeURIComponent(String(next))}${teamId ? `&teamId=${encodeURIComponent(teamId)}` : ""}`;
+  }
+  return out;
+}
+async function listVercelSites(forceRefresh = false) {
+  if (!forceRefresh && cache && Date.now() < cache.expiresAt) return cache.sites;
+  const sites = [];
+  const contexts = [];
+  const personal = process.env.VERCEL_BEARER_TOKEN?.trim();
+  if (personal) contexts.push({ token: personal });
+  const teamTok = process.env.VERCEL_TEAM_TOKEN?.trim();
+  const teamId = process.env.VERCEL_TEAM_ID?.trim();
+  if (teamTok && teamId) contexts.push({ token: teamTok, teamId });
+  const settled = await Promise.allSettled(contexts.map((c5) => listProjects(c5.token, c5.teamId)));
+  settled.forEach((r5, i5) => {
+    if (r5.status !== "fulfilled") {
+      console.warn(`[Vercel Sites] project listing failed for context ${i5}:`, r5.reason);
+      return;
+    }
+    for (const p3 of r5.value) {
+      sites.push({
+        projectId: p3.id,
+        name: p3.name,
+        teamId: contexts[i5].teamId,
+        token: contexts[i5].token,
+        accountId: `vsite-${p3.id}`,
+        createdAt: p3.createdAt ? new Date(p3.createdAt).toISOString() : (/* @__PURE__ */ new Date()).toISOString()
+      });
+    }
+  });
+  cache = { sites, expiresAt: Date.now() + 5 * 60 * 1e3 };
+  return sites;
+}
+async function findVercelSite(accountId) {
+  if (!accountId.startsWith("vsite-")) return void 0;
+  const sites = await listVercelSites();
+  return sites.find((s2) => s2.accountId === accountId);
 }
 
 // server/services/cloudflare.service.ts
@@ -131214,17 +131223,13 @@ function hasCfZoneAnalytics() {
 }
 async function resolveUnifiedLive(timeRange) {
   const jobs = [];
-  const vercel = vault.getAccount("acc-vercel-edge");
-  if (vercel?.apiKey) {
-    jobs.push(fetchVercelAnalytics(vercel.apiKey, vercel.account.targetResource, timeRange, vercel.account.name, vercel.account.id));
+  const sites = await listVercelSites();
+  for (const site of sites) {
+    jobs.push(fetchVercelAnalytics(site, site.projectId, timeRange, site.name, site.accountId));
   }
-  const cf = vault.getAccount("acc-cf-apex");
-  if (cf?.apiKey || hasCfZoneAnalytics()) {
-    const zones = [process.env.CLOUDFLARE_ZONE_ID, process.env.CLOUDFLARE_ZONE_ID_JAMI].map((z) => z?.trim() || "").filter((z) => z && !z.startsWith("zone_"));
-    const cfName = cf?.account.name ?? "Cloudflare";
-    for (const zoneId of zones.length ? zones : []) {
-      jobs.push(fetchCloudflareAnalytics("", zoneId, timeRange, cfName, "acc-cf-apex"));
-    }
+  const cfAccounts = vault.getAccounts("cloudflare");
+  for (const cf of cfAccounts) {
+    jobs.push(fetchCloudflareAnalytics("", cf.targetResource, timeRange, cf.name, cf.id));
   }
   if (hasGoogleSa()) {
     const ga = vault.getAccount("acc-ga4-main");
@@ -131244,6 +131249,13 @@ async function resolveAnalyticsPayload(provider, accountId, timeRange, authentic
     }
     return resolveUnifiedLive(timeRange);
   }
+  if (provider === "vercel" && accountId.startsWith("vsite-")) {
+    const site = await findVercelSite(accountId);
+    if (site) {
+      return fetchVercelAnalytics(site, site.projectId, timeRange, site.name, accountId);
+    }
+    return buildEmptyAnalyticsPayload("vercel", accountId, "Unknown Site", "", timeRange);
+  }
   const stored = vault.getAccount(accountId);
   const targetResource = stored?.account.targetResource || "unified-mesh";
   const accountName = stored?.account.name || "Analytics Feed";
@@ -131251,8 +131263,8 @@ async function resolveAnalyticsPayload(provider, accountId, timeRange, authentic
   if (provider === "vercel" && stored?.apiKey) {
     return fetchVercelAnalytics(stored.apiKey, targetResource, timeRange, accountName, accountId);
   }
-  if (provider === "cloudflare" && stored?.apiKey) {
-    return fetchCloudflareAnalytics(stored.apiKey, targetResource, timeRange, accountName, accountId);
+  if (provider === "cloudflare" && (stored?.apiKey || hasCfZoneAnalytics())) {
+    return fetchCloudflareAnalytics("", targetResource, timeRange, accountName, accountId);
   }
   if (provider === "google" && hasGoogleSa()) {
     return fetchGoogleAnalytics(stored?.apiKey ?? "", targetResource, timeRange, accountName, accountId);
@@ -131334,6 +131346,22 @@ router3.get("/", async (req, res) => {
   try {
     const provider = req.query.provider;
     const accounts = vault.getAccounts(provider);
+    if (!provider || provider === "unified" || provider === "vercel") {
+      const sites = await listVercelSites();
+      const seen = new Set(accounts.map((a5) => a5.id));
+      for (const s2 of sites) {
+        if (seen.has(s2.accountId)) continue;
+        accounts.push({
+          id: s2.accountId,
+          provider: "vercel",
+          name: s2.name,
+          targetResource: s2.projectId,
+          hasKey: true,
+          isLiveConnected: true,
+          createdAt: s2.createdAt
+        });
+      }
+    }
     if (req.user) {
       await initSchema();
       const persisted = await getUserAccounts(req.user.id);
