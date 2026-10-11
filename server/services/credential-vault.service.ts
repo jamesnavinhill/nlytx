@@ -27,7 +27,10 @@ class CredentialVault {
   private readonly masterKey: Buffer;
 
   constructor() {
-    const secret = process.env.VAULT_ENCRYPTION_KEY || process.env.GEMINI_API_KEY || 'unified-analytics-master-salt-2026';
+    const secret = process.env.VAULT_ENCRYPTION_KEY;
+    if (!secret) {
+      throw new Error('VAULT_ENCRYPTION_KEY is required (no fallback keys are permitted for credential encryption)');
+    }
     this.masterKey = crypto.createHash('sha256').update(secret).digest();
     this.seedDefaultAccounts();
     this.seedDefaultInfraAccounts();

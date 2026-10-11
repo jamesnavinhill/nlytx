@@ -8,6 +8,29 @@ interface InfraLogStreamProps {
 
 export const InfraLogStream: React.FC<InfraLogStreamProps> = ({ logs = [] }) => {
   const [levelFilter, setLevelFilter] = useState<'all' | 'INFO' | 'WARN' | 'ERROR'>('all');
+  const [insight, setInsight] = useState<string | null>(null);
+  const [insightLoading, setInsightLoading] = useState(false);
+  const [insightError, setInsightError] = useState<string | null>(null);
+
+  const fetchInsight = async () => {
+    if (insightLoading) return;
+    setInsightLoading(true);
+    setInsightError(null);
+    try {
+      const res = await fetch('/api/insights', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ scope: 'infrastructure' }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.insight) throw new Error(data.error || `Insight failed (${res.status}).`);
+      setInsight(data.insight);
+    } catch (err) {
+      setInsightError(err instanceof Error ? err.message : 'Insight failed.');
+    } finally {
+      setInsightLoading(false);
+    }
+  };
   const [sourceFilter] = useState<string>('all');
 
   const safeLogs = logs || [];
@@ -88,8 +111,26 @@ export const InfraLogStream: React.FC<InfraLogStreamProps> = ({ logs = [] }) => 
               </button>
             ))}
           </div>
+
+          <button
+            onClick={fetchInsight}
+            disabled={insightLoading}
+            className="px-2 py-0.5 border border-border bg-secondary/40 rounded-[2px] uppercase tracking-wider transition-colors cursor-pointer disabled:opacity-50 text-muted-foreground hover:text-foreground"
+            title="AI summary of the current rollup (requires sign-in)"
+          >
+            {insightLoading ? 'ANALYZING…' : 'AI SUMMARY'}
+          </button>
         </div>
       </div>
+
+      {insightError && (
+        <div className="text-[10px] text-destructive font-mono">{insightError}</div>
+      )}
+      {insight && (
+        <div className="text-[11px] leading-relaxed text-foreground/90 bg-secondary/30 border border-border/60 rounded-[2px] p-2 whitespace-pre-wrap">
+          {insight}
+        </div>
+      )}
 
       {/* Log list terminal window */}
       <div className="bg-background border border-border/80 rounded-[2px] p-2 space-y-1 max-h-64 overflow-y-auto overflow-x-hidden font-mono text-[11px] select-text w-full min-w-0">

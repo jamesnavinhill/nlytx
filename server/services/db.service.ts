@@ -75,7 +75,10 @@ export function verifyPassword(password: string, stored: string): boolean {
 // --- AES-256-GCM for stored account keys (same key as the credential vault) ---
 
 function masterKey(): Buffer {
-  const secret = process.env.VAULT_ENCRYPTION_KEY || 'unified-analytics-master-salt-2026';
+  const secret = process.env.VAULT_ENCRYPTION_KEY;
+  if (!secret) {
+    throw new Error('VAULT_ENCRYPTION_KEY is required (no fallback keys are permitted for credential encryption)');
+  }
   return crypto.createHash('sha256').update(secret).digest();
 }
 

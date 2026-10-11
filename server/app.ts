@@ -1,5 +1,6 @@
 import express from 'express';
 import analyticsRoutes from './routes/analytics.routes';
+import insightsRoutes from './routes/insights.routes';
 import accountsRoutes from './routes/accounts.routes';
 import infrastructureRoutes from './routes/infrastructure.routes';
 import authRoutes from './routes/auth.routes';
@@ -18,6 +19,7 @@ export function createApiApp(): express.Express {
   });
 
   app.use('/api/analytics', analyticsRoutes);
+  app.use('/api/insights', insightsRoutes);
   app.use('/api/accounts', accountsRoutes);
   app.use('/api/infrastructure', infrastructureRoutes);
   app.use('/api/auth', authRoutes);

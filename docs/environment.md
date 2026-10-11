@@ -15,7 +15,7 @@ The `.auth` house rule: a key earns a place in canonical env only after a live A
 | Key | Provenance | Verified | Notes |
 | --- | --- | --- | --- |
 | `VERCEL_BEARER_TOKEN` | Dashboard personal access token for **jamesnavinhill** (Full Account, No Expiration), created 2026-08-30; canon `VERCEL_JNH_TOKEN` | ✅ `/v2/user` → jamesnavinhill, 7 personal projects, web-analytics aggregate | Replaces a static `vca_` OAuth CLI token that **died at source** within a day (root cause of empty Vercel charts 2026-08-30). `vca_` access tokens are short-lived by design and `vcr_` refresh tokens rotate on every use (empirically verified — an old refresh token died within minutes of being superseded), so only dashboard-minted `vcp_` PATs may be stored in env. `POST /v3/user/tokens` refuses minting for the CLI's OAuth app ("Cannot create tokens for this app"). |
-| `VERCEL_PROJECT_ID` | `docs/roadmap/outline.md` | ✅ live read-back | `prj_M20YXbR6g9k5VzIXQfoaCnv5ihTL` = `jameshill/nlytx`, framework preset Vite |
+| `VERCEL_PROJECT_ID` | `docs/roadmap/outline.md` | (removed — never read by code) | `prj_M20YXbR6g9k5VzIXQfoaCnv5ihTL` = `jameshill/nlytx`, framework preset Vite |
 | `CLOUDFLARE_API_TOKEN` | `.auth/env/.env.canonical` | ✅ zone list + GraphQL + tokens/verify | No DNS-record scope (fine for analytics; blocked DNS edits during verification) |
 | `CLOUDFLARE_ACCOUNT_ID` | `.auth/env/.env.canonical` | ✅ via API | jami-studio account |
 | `CLOUDFLARE_ZONE_ID` | set 2026-08-30 from zone list | ✅ | `1d561b7ab18fb22c3ecf01acc2210788` = **navinhill.com** |
@@ -59,4 +59,4 @@ The earlier "dead key" conclusion was a wrong-key mixup, and the management key 
 
 1. `.env` is a projection — regenerate it from canon, don't hand-edit secrets in repos.
 2. Every new key gets a live read-back before it counts as verified (see [verification/](verification/)).
-3. `GEMINI_API_KEY` / `APP_URL` from the AI Studio scaffold are no longer read by the app (no LLM calls by design) and were dropped from `.env`.
+3. `GEMINI_API_KEY (removed — the credential vault now requires VAULT_ENCRYPTION_KEY with no fallbacks)` / `APP_URL` from the AI Studio scaffold are no longer read by the app (no LLM calls by design) and were dropped from `.env`.
